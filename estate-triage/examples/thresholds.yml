@@ -1,0 +1,12 @@
+top_n: 25
+recent_backup_days: 14
+stale_backup_days: 60
+high_cpu_count: 8
+high_memory_mib: 32768
+small_workload_mib: 204800
+large_backup_mib: 1048576
+low_change_rate_pct: 1.0
+high_backup_to_used_ratio: 3.0
+many_restore_points: 30
+idle_cpu_pct: 5
+low_memory_usage_pct: 30

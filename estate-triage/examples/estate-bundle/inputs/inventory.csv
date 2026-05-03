@@ -1,0 +1,26 @@
+VM,VM UUID,Powerstate,CPUs,Memory MiB,Provisioned MiB,In Use MiB,OS,Snapshot total MiB,CPU usage percent,Memory usage percent,Tags,Notes
+mig-payments-api,inv-uuid-001,poweredOn,4,8192,153600,72000,Generic Linux,0,18,48,motion:migration;service:payments,steady protected app
+mig-orders-worker,inv-uuid-002,poweredOn,4,8192,153600,76000,Generic Linux,0,16,46,motion:migration;service:orders,steady worker
+mig-portal-web,inv-uuid-003,poweredOn,2,4096,102400,54000,Generic Linux,0,22,52,motion:migration;service:portal,small web tier
+mig-claims-app,inv-uuid-004,poweredOn,4,8192,153600,82000,Generic Server OS,0,20,50,motion:migration;service:claims,stable protected service
+mig-data-sync,inv-uuid-005,poweredOn,2,4096,102400,48000,Generic Linux,0,14,44,motion:migration;service:data-sync,small integration job
+mig-report-service,inv-uuid-006,poweredOn,2,4096,102400,60000,Generic Linux,0,17,49,motion:migration;service:reporting,repeatable migration review
+mig-support-api,inv-uuid-025,poweredOn,2,4096,102400,62000,Generic Linux,0,19,47,motion:migration;service:support,small support service
+rightsize-dev-build,inv-uuid-007,poweredOn,12,65536,614400,320000,Generic Linux,0,3,22,motion:rightsizing;service:developer-platform,utilization-backed right-sizing
+rightsize-analytics-cache,inv-uuid-008,poweredOn,16,65536,716800,360000,Generic Linux,0,4,24,motion:rightsizing;service:analytics,oversized cache
+rightsize-qa-db,inv-uuid-009,poweredOn,8,32768,512000,260000,Generic Server OS,0,5,28,motion:rightsizing;service:qa,low utilization validation
+rightsize-unused-app,inv-uuid-010,poweredOn,8,32768,409600,220000,Generic Linux,0,4,20,motion:rightsizing;service:internal-tools,low utilization review
+archive-legacy-crm,inv-uuid-011,poweredOff,2,4096,81920,24000,Unknown,0,,,motion:archive;service:crm,retired service candidate
+archive-retired-report,inv-uuid-012,poweredOff,2,4096,81920,22000,Unknown,0,,,motion:archive;service:reporting,old reporting node
+archive-lab-tool,inv-uuid-013,poweredOff,2,4096,51200,18000,Unknown,0,,,motion:archive;service:lab,stale lab workload
+archive-old-batch,inv-uuid-014,poweredOff,2,4096,51200,20000,Unknown,0,,,motion:archive;service:batch,old batch workload
+dr-core-db,inv-uuid-015,poweredOn,8,32768,2097152,524288,Generic Server OS,0,18,58,motion:dr;service:core-db,large protected data service
+dr-file-share,inv-uuid-016,poweredOn,8,32768,3145728,786432,Generic Server OS,0,12,52,motion:dr;service:files,large file service
+dr-erp-db,inv-uuid-017,poweredOn,12,65536,4194304,1048576,Generic Server OS,0,15,55,motion:dr;service:erp,large restore footprint
+dr-records-store,inv-uuid-018,poweredOn,8,32768,2097152,614400,Generic Linux,0,11,47,motion:dr;service:records,high backup ratio
+needs-backup-match,inv-uuid-019,poweredOn,4,8192,153600,70000,Generic Linux,0,19,45,motion:needs-data;service:unknown,no backup row should become data request
+needs-storage-used,inv-uuid-020,poweredOn,4,8192,153600,,Generic Linux,0,18,45,motion:needs-data;service:unknown,missing used storage
+needs-change-rate,inv-uuid-021,poweredOn,4,8192,153600,70000,Generic Linux,0,18,45,motion:needs-data;service:unknown,missing daily change from backup
+identity-name-only,,poweredOn,2,4096,102400,58000,Generic Linux,0,21,50,motion:needs-data;service:unknown,name-only match needs confirmation
+snapshot-risk-app,inv-uuid-023,poweredOn,4,8192,153600,70000,Generic Linux,20480,18,48,motion:review;service:payments,snapshot blocker before presentation
+mig-platform-large,inv-uuid-024,poweredOn,16,65536,716800,360000,Generic Server OS,0,,,motion:migration;service:platform,large platform workload with sparse utilization side signal

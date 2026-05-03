@@ -1,0 +1,25 @@
+transaction_id: customer_update
+display_name: Customer Update
+endpoint_path: /transactions/customer-update
+fields:
+  - screen_ref: screen_001
+    field_id: f_05_30
+    name: account_number
+    role: input
+    type: string
+    required: true
+    sensitive: true
+  - screen_ref: screen_001
+    field_id: f_06_30
+    name: phone
+    role: input
+    type: string
+    required: true
+    sensitive: false
+  - screen_ref: screen_003
+    field_id: f_05_30
+    name: update_status
+    role: output
+    type: string
+    required: false
+    sensitive: false

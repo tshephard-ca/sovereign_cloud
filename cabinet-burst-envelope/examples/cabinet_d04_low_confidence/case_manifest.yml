@@ -1,0 +1,15 @@
+schema_version: cabinet-burst-envelope.case_manifest.v1
+cabinet_id: cab-d04
+case_goal: assign a cabinet review lane from normalized local evidence
+business_scenario: weak evidence and missing profile details require collection before review
+expected_review_lane: COLLECT_EVIDENCE
+review_owner: operations
+remediation_owner: operations
+do_not_claim:
+  - facility approval
+  - reserved capacity
+  - customer commitment
+  - quote
+  - operational change
+notes:
+  - Canonical low-confidence evidence example.

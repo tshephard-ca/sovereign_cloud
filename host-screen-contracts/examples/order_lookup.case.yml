@@ -1,0 +1,12 @@
+transaction_id: order_lookup
+case_id: happy_path_order_lookup
+start_screen_hash: 9fa08b853317
+steps:
+  - expect_screen_hash: 9fa08b853317
+    inputs:
+      order_number: "10004567"
+    aid: ENTER
+    expect_next_screen_hash: 3188cc188265
+expected_response:
+  customer_name: SAMPLE CUSTOMER
+  order_status: SHIPPED

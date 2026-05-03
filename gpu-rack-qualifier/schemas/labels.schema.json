@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gpu-rack-qualifier/labels.schema.json",
+  "title": "gpu-rack-qualifier labels CSV row",
+  "type": "object",
+  "required": [
+    "node_name",
+    "qualification_status",
+    "confidence",
+    "slurm_features",
+    "recommended_state",
+    "recommended_partition_hint",
+    "reason_codes",
+    "blockers",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "node_name": {"type": "string"},
+    "qualification_status": {"enum": ["PASS", "REVIEW", "INFERENCE_ONLY", "AVOID_MULTINODE", "QUARANTINE"]},
+    "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+    "slurm_features": {"type": "string"},
+    "recommended_state": {"enum": ["KEEP", "REVIEW", "DRAIN_REVIEW", "QUARANTINE_REVIEW"]},
+    "recommended_partition_hint": {"type": "string"},
+    "reason_codes": {"type": "string"},
+    "blockers": {"type": "string"},
+    "warnings": {"type": "string"}
+  }
+}

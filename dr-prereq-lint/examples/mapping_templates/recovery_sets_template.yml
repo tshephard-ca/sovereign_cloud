@@ -1,0 +1,4 @@
+recovery_sets:
+  - name: dr-test-001
+    purpose: application recovery-test preflight
+    site: lab

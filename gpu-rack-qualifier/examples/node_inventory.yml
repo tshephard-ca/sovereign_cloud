@@ -1,0 +1,44 @@
+cluster_id: example-gpu-cluster
+rack_id: rack-a01
+
+expected:
+  gpu_count: 4
+  gpu_product_name_regex: ".*"
+  driver_version: ">=550.0"
+  cuda_version: ">=12.0"
+  vbios_consistent_within_node: true
+  mig_mode: "disabled"
+  ecc_mode: "enabled"
+
+nodes:
+  - name: gpu001
+    rack: rack-a01
+    expected_role:
+      - training
+      - inference
+    expected_gpu_count: 4
+    expected_nic_count: 2
+    expected_features:
+      - gpu
+      - training
+    maintenance_window: null
+
+  - name: gpu002
+    rack: rack-a01
+    expected_role:
+      - training
+      - inference
+    expected_gpu_count: 4
+
+  - name: gpu003_weak_link
+    rack: rack-a01
+    expected_role:
+      - training
+      - inference
+    expected_gpu_count: 4
+
+  - name: gpu004_sensor_warn
+    rack: rack-a01
+    expected_role:
+      - inference
+    expected_gpu_count: 4

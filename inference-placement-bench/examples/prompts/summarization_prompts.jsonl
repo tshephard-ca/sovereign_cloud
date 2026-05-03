@@ -1,0 +1,2 @@
+{"id": "s001", "prompt": "Summarize this synthetic operations note into three concise bullets.", "input_tokens_estimate": 16, "expected_output_tokens_estimate": 45}
+{"id": "s002", "prompt": "Create a short summary of a generic project update with action items.", "input_tokens_estimate": 17, "expected_output_tokens_estimate": 45}

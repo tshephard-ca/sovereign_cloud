@@ -1,0 +1,4 @@
+gpus_per_node: 4
+hours_at_risk: 24
+accelerator_hour_value: 3.5
+release_goal: multinode_training

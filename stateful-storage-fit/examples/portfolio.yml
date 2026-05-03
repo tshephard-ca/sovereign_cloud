@@ -1,0 +1,27 @@
+workloads:
+  - id: vm1-database
+    df: vm1/df.txt
+    mount: vm1/mount.txt
+    fstab: vm1/fstab.txt
+    iostat: vm1/iostat.txt
+    ps: vm1/ps.txt
+    storage_profile: storage-profile.yml
+
+  - id: vm2-shared-filesystem
+    df: vm2_shared_fs/df.txt
+    mount: vm2_shared_fs/mount.txt
+    fstab: vm2_shared_fs/fstab.txt
+    iostat: vm2_shared_fs/iostat.txt
+    ps: vm2_shared_fs/ps.txt
+    storage_profile: storage-profile.yml
+    policy_pack: policy-packs/file-server.yml
+
+  - id: vm3-db-latency-risk
+    df: vm3_db_latency_risk/df.txt
+    mount: vm3_db_latency_risk/mount.txt
+    fstab: vm3_db_latency_risk/fstab.txt
+    iostat: vm3_db_latency_risk/iostat.txt
+    ps: vm3_db_latency_risk/ps.txt
+    storage_profile: storage-profile.yml
+    policy_pack: policy-packs/relational-database.yml
+

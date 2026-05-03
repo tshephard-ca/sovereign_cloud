@@ -1,0 +1,15 @@
+schema_version: cabinet-burst-envelope.case_manifest.v1
+cabinet_id: cab-a01
+case_goal: assign a cabinet review lane from normalized local evidence
+business_scenario: clean cabinet prequalification for facility review
+expected_review_lane: READY_FOR_FACILITY_REVIEW
+review_owner: facility_engineering
+remediation_owner: operations
+do_not_claim:
+  - facility approval
+  - reserved capacity
+  - customer commitment
+  - quote
+  - operational change
+notes:
+  - Canonical healthy cabinet example.

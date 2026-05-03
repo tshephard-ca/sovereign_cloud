@@ -1,0 +1,39 @@
+workload_id: summarization
+display_name: Synthetic summarization workload
+workload_type: summarization
+
+model:
+  declared_model_name: generic-summary-model
+  model_family: completion
+  min_context_window_tokens: 16384
+  expected_input_tokens_p50: 3000
+  expected_input_tokens_p95: 6000
+  expected_output_tokens_p50: 300
+  expected_output_tokens_p95: 800
+  streaming_required: false
+
+benchmark:
+  prompt_file: examples/prompts/summarization_prompts.jsonl
+  warmup_requests: 1
+  measured_requests: 5
+  concurrency: 1
+  request_timeout_seconds: 60
+  random_seed: 12345
+
+request:
+  method: POST
+  path: /v1/completions
+  headers:
+    Content-Type: application/json
+  body_template:
+    model: "{{model_name}}"
+    prompt: "{{prompt}}"
+    temperature: 0
+    max_tokens: "{{max_output_tokens}}"
+    stream: "{{streaming}}"
+
+response_extractors:
+  non_streaming:
+    text_json_path: "$.choices[0].text"
+    usage_input_tokens_json_path: "$.usage.prompt_tokens"
+    usage_output_tokens_json_path: "$.usage.completion_tokens"

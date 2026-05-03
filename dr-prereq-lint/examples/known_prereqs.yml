@@ -1,0 +1,39 @@
+internal_domains:
+  - example.internal
+  - corp.example
+
+prerequisites:
+  - id: remote_portal
+    display_name: Remote access portal
+    category: vpn_endpoint
+    names:
+      - remote.example.internal
+      - portal.example.internal
+    qname_regex:
+      - '(^|\.)vpn[0-9-]*\.example\.internal$'
+      - '(^|\.)remote[0-9-]*\.example\.internal$'
+    required_in_recovery_set: true
+
+  - id: license_core
+    display_name: License service
+    category: license_server
+    qname_regex:
+      - '(^|\.)lic(en[cs]e)?[0-9-]*\.apps\.example\.internal$'
+      - '(^|\.)kms[0-9-]*\.apps\.example\.internal$'
+    required_in_recovery_set: true
+
+  - id: database_core
+    display_name: Core database service
+    category: database_host
+    qname_regex:
+      - '(^|\.)(sql|db)[0-9-]*\.apps\.example\.internal$'
+    required_in_recovery_set: true
+
+  - id: file_services
+    display_name: File services
+    category: file_share
+    qname_regex:
+      - '(^|\.)files?[0-9-]*\.apps\.example\.internal$'
+      - '(^|\.)dfs[0-9-]*\.apps\.example\.internal$'
+      - '(^|\.)nas[0-9-]*\.apps\.example\.internal$'
+    required_in_recovery_set: true

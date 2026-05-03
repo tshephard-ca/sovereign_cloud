@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/cabinet-burst-envelope/review_lane.schema.json",
+  "title": "Cabinet Review Lane Decision",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "tool_version",
+    "cabinet_id",
+    "lane",
+    "envelope_status",
+    "business_action",
+    "decision_owner",
+    "primary_constraint",
+    "evidence_gate",
+    "remediation_categories",
+    "next_actions",
+    "conversation_boundary",
+    "why_this_matters",
+    "decision_trace",
+    "reason_codes",
+    "warnings",
+    "blockers"
+  ],
+  "properties": {
+    "schema_version": {"const": "cabinet-burst-envelope.review_lane.v1"},
+    "tool_version": {"type": "string"},
+    "cabinet_id": {"type": "string"},
+    "lane": {"enum": ["READY_FOR_FACILITY_REVIEW", "NEEDS_REMEDIATION", "STOP_EXPANSION_DISCUSSION", "COLLECT_EVIDENCE"]},
+    "envelope_status": {"enum": ["READY_FOR_REVIEW", "REVIEW_REQUIRED", "DO_NOT_EXPAND", "INSUFFICIENT_DATA"]},
+    "business_action": {"type": "string"},
+    "decision_owner": {"type": "string"},
+    "primary_constraint": {"type": "string"},
+    "evidence_gate": {"type": "string"},
+    "remediation_categories": {"type": "array", "items": {"type": "string"}},
+    "next_actions": {"type": "array", "items": {"$ref": "#/$defs/action_item"}},
+    "conversation_boundary": {"type": "string"},
+    "why_this_matters": {"type": "string"},
+    "decision_trace": {"type": "object"},
+    "reason_codes": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "blockers": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "action_item": {
+      "type": "object",
+      "required": ["action_id", "title", "owner", "priority", "reason_codes", "evidence_needed", "business_impact", "completion_signal"],
+      "properties": {
+        "action_id": {"type": "string"},
+        "title": {"type": "string"},
+        "owner": {"type": "string"},
+        "priority": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "evidence_needed": {"type": "array", "items": {"type": "string"}},
+        "business_impact": {"type": "string"},
+        "completion_signal": {"type": "string"}
+      }
+    }
+  },
+  "additionalProperties": true
+}

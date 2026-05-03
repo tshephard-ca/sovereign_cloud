@@ -1,0 +1,3 @@
+/dev/sda1 on / type ext4 (rw,relatime)
+/dev/sdb1 on /var/lib/postgresql type xfs (rw,relatime,attr2,inode64)
+

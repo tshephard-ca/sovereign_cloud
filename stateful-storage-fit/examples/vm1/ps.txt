@@ -1,0 +1,3 @@
+101 postgres /usr/lib/postgresql/bin/postgres -D /data/postgres
+202 app-worker /opt/app/bin/worker --config /etc/app/config.yml
+

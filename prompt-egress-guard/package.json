@@ -1,0 +1,30 @@
+{
+  "name": "prompt-egress-guard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first prompt egress guard for configured public AI sites.",
+  "license": "Apache-2.0",
+  "bin": {
+    "prompt-egress-guard": "packages/cli/dist/index.js"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b packages/core packages/extension packages/cli",
+    "test": "vitest run",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true}); for (const p of ['packages/core','packages/extension','packages/cli']) require('fs').rmSync(p + '/dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.12.12",
+    "esbuild": "^0.21.5",
+    "happy-dom": "^14.12.3",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}

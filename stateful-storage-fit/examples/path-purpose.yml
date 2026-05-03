@@ -1,0 +1,7 @@
+paths:
+  - path: /data
+    purpose: primary application data
+    read_write_pattern: read_write
+    writer_topology: single_writer
+    owner_confidence: HIGH
+    notes: Declared by the workload owner for synthetic example coverage.

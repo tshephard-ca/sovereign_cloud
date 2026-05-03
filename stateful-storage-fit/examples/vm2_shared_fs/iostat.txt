@@ -1,0 +1,8 @@
+Linux 6.1.0 synthetic
+
+Device            r/s     w/s    rkB/s    wkB/s   await  aqu-sz  %util
+sda              0.20    0.20     8.00     8.00    0.80    0.01   1.00
+
+Device            r/s     w/s    rkB/s    wkB/s   await  aqu-sz  %util
+sda              0.20    0.40     8.00    16.00    1.00    0.01   1.50
+

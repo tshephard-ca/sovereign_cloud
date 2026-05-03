@@ -1,0 +1,6 @@
+owner_team,category,contact,notes
+network-team,dns_resolver|vpn_endpoint,network-queue,Owns resolver and remote-access prerequisite questions.
+identity-team,directory_service|kerberos_service|global_catalog,identity-queue,Owns identity-platform prerequisite questions.
+database-team,database_host,database-queue,Owns database host prerequisite questions.
+storage-team,file_share,storage-queue,Owns file service prerequisite questions.
+application-team,license_server|other_prerequisite,application-queue,Owns application-specific prerequisite questions.

@@ -1,0 +1,9 @@
+default_total_queries: 20
+required_allowed_queries: 10
+required_forbidden_queries: 10
+business_context:
+  release_name: demo-enterprise-rag-release
+  owner: ai-platform
+  risk_domain: cross_department_rag_permissions
+  deployment_stage: pre_launch
+  decision_threshold: fail_blocks_release

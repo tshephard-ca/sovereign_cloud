@@ -1,0 +1,15 @@
+schema_version: cabinet-burst-envelope.case_manifest.v1
+cabinet_id: cab-b02
+case_goal: assign a cabinet review lane from normalized local evidence
+business_scenario: top-inlet hot spot blocks a clean expansion conversation
+expected_review_lane: STOP_EXPANSION_DISCUSSION
+review_owner: facility_engineering
+remediation_owner: facility_engineering
+do_not_claim:
+  - facility approval
+  - reserved capacity
+  - customer commitment
+  - quote
+  - operational change
+notes:
+  - Canonical thermal blocker example.

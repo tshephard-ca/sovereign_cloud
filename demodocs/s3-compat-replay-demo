@@ -1,0 +1,779 @@
+# s3-compat-replay Demo Deep Dive
+
+Date: 2026-05-02
+Repository reviewed: `s3-compat-replay`
+Fresh demo run: `/tmp/s3-compat-replay-demo-run`
+
+## Executive Thesis
+
+`s3-compat-replay` is strongest when positioned as a local, evidence-backed semantic
+compatibility preflight for S3-compatible object-storage migrations and endpoint
+changes. It is not a migration engine, benchmark, pricing model, or object copier.
+Its business value is that it converts real observed object-storage behavior into a
+targeted probe plan, runs safe synthetic checks against a target scratch bucket, and
+then translates mismatches into a cutover decision brief, remediation queue, owner
+questions, and migration risks before a production cutover.
+
+The core business story is simple: object-copy success does not prove application
+compatibility. Applications often depend on API semantics around CORS, presigned
+URLs, version IDs, object tags, metadata round trips, multipart uploads, legal hold,
+retention, delete markers, range reads, conditional requests, ACL behavior, ownership
+controls, and list pagination. Those are exactly the areas this repo models, probes,
+and turns into a business-facing cutover recommendation.
+
+Important caveat: the fresh run used the repo's deterministic generator and simulated
+semantic target results. That is appropriate for demo coverage and product validation,
+but it is not a certification of any real endpoint. A live deployment must run the
+generated probe plan against the customer's chosen target endpoint and scratch bucket.
+
+## External Reference Frame
+
+The analysis below is grounded in the repo and these external references:
+
+- Amazon S3 API Reference:
+  https://docs.aws.amazon.com/AmazonS3/latest/API/Type_API_Reference.html
+  The S3 API surface contains bucket-level and object-level operations, data types,
+  and behavior contracts. This supports the product thesis that compatibility is more
+  than basic object upload and download.
+
+- CloudTrail data events:
+  https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-data-events-with-cloudtrail.html
+  CloudTrail data events include object-level API activity such as `GetObject`,
+  `PutObject`, and `DeleteObject`. This supports the repo's use of CloudTrail-style
+  events as observed usage evidence while also explaining why request hints and HTTP
+  traces are needed for fields CloudTrail does not fully expose.
+
+- S3 CloudTrail behavior:
+  https://docs.aws.amazon.com/AmazonS3/latest/userguide/cloudtrail-logging-s3-info.html
+  The S3-specific CloudTrail documentation distinguishes bucket-level management
+  events from object-level data events. This is directly relevant to the tool's input
+  model and warnings about incomplete evidence.
+
+- Server access logging:
+  https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html
+  Server access logs provide detailed request records useful for security and access
+  audits. This supports the repo's optional server-access-log input path.
+
+- S3 data consistency:
+  https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html
+  S3's documented consistency model matters because applications may assume immediate
+  visibility of writes, deletes, tags, ACLs, metadata, and list results. The repo
+  correctly treats consistency as a semantic behavior to review.
+
+- Object Lock:
+  https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html
+  Object Lock uses WORM-style controls with retention periods and legal holds, and is
+  tied to versioned object behavior. This supports the repo's Object Lock and
+  retention business stories.
+
+- NIST SP 800-209, Security Guidelines for Storage Infrastructure:
+  https://csrc.nist.gov/pubs/sp/800/209/final
+  NIST frames storage as a major infrastructure pillar and highlights configuration
+  control, data protection, isolation, restoration assurance, and encryption. The
+  repo maps well to that risk-management framing.
+
+- NIST SP 800-34 Rev. 1, Contingency Planning Guide:
+  https://csrc.nist.gov/pubs/sp/800/34/r1/final
+  Contingency and recovery planning are relevant because object-storage migrations
+  often affect backup, archive, retention, recovery, and production restoration paths.
+
+## Local Evidence Collected
+
+I validated the repo locally with the test suite and a fresh deterministic demo run.
+
+Test command:
+
+```text
+PYTHONPATH=src python3 -m pytest -q
+```
+
+Result after the enhancement pass:
+
+```text
+57 passed
+```
+
+Fresh run stages executed:
+
+- Generated real-world-style input fixtures.
+- Analyzed CloudTrail-style object events plus request hints and offline bucket config.
+- Produced a usage profile, probe plan, compatibility-needs CSV, and capability ledger.
+- Simulated target probe results to force full semantic coverage.
+- Produced mismatches, summary JSON/Markdown, cutover brief, remediation queue,
+  owner questions, compatibility matrix, policy evaluation, real-world assessment,
+  and strict-redaction case bundle.
+- Validated the shareable bundle with strict redaction.
+
+Bundle validation result:
+
+```text
+PASS
+```
+
+## Generated Input Deep Dive
+
+The generated input is credible as a broad compatibility fixture because it covers
+multiple evidence forms rather than a single synthetic CSV.
+
+Generated input artifacts included:
+
+- CloudTrail-style S3 data events in JSON, JSONL, and gzip forms.
+- Request hints that expose semantics not reliably present in CloudTrail alone.
+- Offline source bucket configuration.
+- Sanitized HTTP trace.
+- Server access log.
+- Business context.
+- Policy context.
+- Corpus calibration metadata.
+
+The fresh fixture generated 180 object-storage events over five workload types:
+
+- application upload bucket
+- public assets
+- backup archive
+- regulated retention
+- data lake
+
+The operation-family coverage was 100 percent for the repo's modeled family set:
+
+- `object_read`
+- `object_write`
+- `object_delete`
+- `object_list`
+- `multipart`
+- `tagging`
+- `acl`
+- `versioning`
+- `cors`
+- `object_lock`
+- `presigned`
+- `encryption_headers`
+
+Representative observed event mix:
+
+- `GetObject`: 29
+- `HeadObject`: 17
+- `PutObject`: 9
+- `CreateMultipartUpload`: 8
+- `ListObjectsV2`: 8
+- `CompleteMultipartUpload`: 4
+- `UploadPart`: 4
+- `UploadPartCopy`: 4
+- `PutObjectTagging`: 4
+- `GetObjectTagging`: 4
+- `PutObjectRetention`: 4
+- `PutObjectLegalHold`: 4
+- `GetBucketCors`: 4
+- `PutBucketCors`: 4
+- `DeleteObject`: 4
+- `DeleteObjects`: 4
+
+The generated request hints made the data much more realistic than plain API names:
+
+- Presigned GET and PUT behavior with expiration buckets up to 3600 seconds.
+- Browser CORS origins, methods, and headers.
+- Metadata headers such as client and source-system markers.
+- Object tags and tag-dependent workflows.
+- Conditional requests.
+- Range GETs.
+- Object Lock and retention behavior.
+- Error-shape comparisons.
+- Object body classes and size distribution.
+- Requester-pays context.
+- Pagination expectations.
+- Consistency expectations.
+
+The offline bucket config also made the scenario credible:
+
+- Versioning enabled.
+- Object Lock enabled with default governance retention.
+- CORS rules present.
+- Lifecycle expiration for temporary objects.
+- Bucket-owner-enforced ownership controls.
+- Default encryption.
+- Replication and event notification context.
+- Policy context with allow and deny shapes.
+
+The input quality is high for a demo because it exercises application semantics. It
+does not pretend that CloudTrail alone is enough; it supplements CloudTrail with
+request hints, HTTP trace, access-log evidence, and offline config.
+
+## Code Deep Dive
+
+The repo is organized around a defensible evidence-to-probe pipeline.
+
+### CLI Surface
+
+`src/s3_compat_replay/cli.py` exposes a broad but coherent command surface:
+
+- `analyze`
+- `probe`
+- `summarize`
+- `validate`
+- `schema`
+- `compare-results`
+- `preflight package`
+- `bundle create`
+- `bundle validate`
+- `corpus import`
+- `corpus summarize`
+- `questionnaire generate`
+- `policy list`
+- `policy show`
+- `policy evaluate`
+- `lab generate`
+- `lab simulate-results`
+- `lab assess`
+
+That command set matters commercially because it supports more than a static report:
+offline discovery, live preflight, evidence packaging, policy evaluation, corpus
+learning, and repeatable demo generation.
+
+### Models and Contracts
+
+`src/s3_compat_replay/models.py` defines typed models for the core artifacts:
+
+- CloudTrail-style events
+- normalized S3 events
+- usage profiles
+- request hints
+- bucket configuration
+- probe steps
+- probe plans
+- probe results
+- mismatches
+- cleanup manifests
+- compatibility summaries
+- cutover decision briefs
+- capability findings
+- remediation items
+- redaction reports
+
+This is a defensible architecture decision. The product is not just printing text; it
+is creating versioned, typed evidence that can be validated, compared, bundled, and
+used by downstream tooling.
+
+### Usage Profiling
+
+`src/s3_compat_replay/usage_profile.py` turns observed events, request hints, and
+bucket config into operation-family counts, observed features, warnings, and risk
+flags. This is the first piece of core technology: it compiles messy operational
+evidence into a structured semantic profile.
+
+Strong design points:
+
+- CloudTrail incompleteness is surfaced as warnings.
+- CORS is treated as needing HTTP-level probe evidence.
+- Object Lock is treated as requiring bucket support.
+- Lifecycle is treated as static-only evidence, not a proven runtime behavior.
+- Confidence is derived from evidence quality rather than asserted blindly.
+
+### Probe Planning
+
+`src/s3_compat_replay/probe_plan.py` converts observed behavior into a safe synthetic
+probe plan. This is the second core technology layer: it maps usage semantics into
+target endpoint checks.
+
+The generated plan in the fresh run contained 29 probes across:
+
+- object read/write/list/delete
+- tagging
+- ACL behavior
+- versioning
+- multipart upload
+- presigned URLs
+- CORS
+- conditional requests
+- range GETs
+- metadata round trips
+- encryption headers
+- Object Lock
+- presigned expiry
+- list pagination
+- versioning delete markers
+- consistency
+- authorization context
+- ownership controls
+- requester-pays behavior
+- lifecycle static review
+
+This is exactly the right abstraction for a pre-sales or pre-migration tool: do not
+test every possible API; test the semantics the observed workload appears to need.
+
+### Probe Safety
+
+`src/s3_compat_replay/safety.py` and `src/s3_compat_replay/probes/` enforce important
+operational boundaries:
+
+- Scratch-prefix validation.
+- Tiny synthetic objects.
+- No source-bucket reads.
+- Writes disabled unless explicitly allowed.
+- Deletes, ACL, multipart, and Object Lock operations separately gated.
+- Cleanup manifest support.
+- TLS-disabled warning path.
+
+This safety model is a business enabler. Without it, conservative customers and
+partners would resist running compatibility probes in real environments.
+
+### S3-Compatible Client
+
+`src/s3_compat_replay/s3_client.py` wraps live target operations through an
+S3-compatible client interface. The repo intentionally avoids migration tooling and
+source-object reads. Credentials are supplied through named environment variables,
+not embedded in artifacts.
+
+The important product point is that live probing is possible, but controlled. The
+tool's job is semantic preflight, not data movement.
+
+### Decision Package and Reporting
+
+`src/s3_compat_replay/compare.py`, `src/s3_compat_replay/report.py`, and
+`src/s3_compat_replay/decision.py` translate raw probe observations into mismatch
+codes, business impact language, owner questions, capability findings, remediation
+queues, and a cutover recommendation.
+
+This is where the tool moves from engineering utility to business value:
+
+- A failed CORS probe becomes a browser-flow risk.
+- A failed Object Lock probe becomes a retention/legal-hold risk.
+- A failed multipart probe becomes a large-ingest risk.
+- A failed metadata or tag round trip becomes a workflow-routing risk.
+- A versioning/delete-marker mismatch becomes a recovery/audit risk.
+- A set of mismatches becomes a `BLOCK`, `REVIEW`, or `PROCEED_WITH_CAVEATS`
+  cutover decision.
+
+### Questionnaire and Policy Packs
+
+`src/s3_compat_replay/questionnaire.py` and `policy-packs/` make the output actionable.
+The generated app-owner questions are not generic; they are tied to observed features
+and mismatches. Policy packs let a partner or platform team express which semantics
+matter for a workload pattern.
+
+The fresh `application-uploads` policy evaluation passed its evidence checklist and
+applied blocker severity to CORS, metadata, presigned URL, and tag mismatches.
+
+### Redaction, Bundles, and Corpus
+
+`src/s3_compat_replay/artifact_redaction.py` and `src/s3_compat_replay/bundle.py`
+provide a strict redaction and shareable case-bundle mechanism. This is a major
+defensibility component:
+
+- Partners can share sanitized evidence without exposing bucket names, account IDs,
+  IPs, raw object keys, ARNs, endpoint names, presigned signatures, credentials, or
+  provider names.
+- Case bundles can feed a corpus.
+- A corpus can improve policy packs, probe templates, and mismatch prioritization.
+
+That creates a learning loop without requiring telemetry or external services.
+
+## Generated Output Deep Dive
+
+The fresh run produced a realistic compatibility failure story rather than a shallow
+green demo.
+
+Key output facts:
+
+- Assessment status: `PASS` for coverage quality.
+- Cutover recommendation: `BLOCK`.
+- Evidence coverage status: `PASS`.
+- Target semantic status: `FAIL`.
+- Profile processed events: 180.
+- Probe count: 29.
+- Required probes: 23.
+- Required probes failed: 16.
+- Required probes needing review: 3.
+- Unsafe probes gated: 5.
+- Plan family coverage: 100 percent.
+- Result source: simulated semantic fixture.
+- Probe status counts:
+  - `PASS`: 4
+  - `FAIL`: 16
+  - `REVIEW`: 9
+- Business blockers: 16.
+- Review items: 9.
+- Capability ledger entries: 23.
+- Input gaps: none.
+- Output gaps: none.
+
+The top mismatch and review codes were commercially meaningful:
+
+- `COPY_OBJECT_FAILED`
+- `TAGGING_ROUNDTRIP_FAILED`
+- `ACL_UNSUPPORTED_OR_DISABLED`
+- `VERSIONING_TARGET_NOT_ENABLED`
+- `MULTIPART_COMPLETE_FAILED`
+- `PRESIGNED_URL_FAILED`
+- `CORS_PREFLIGHT_MISMATCH`
+- `CONDITIONAL_REQUEST_MISMATCH`
+- `RANGE_GET_MISMATCH`
+- `METADATA_ROUNDTRIP_FAILED`
+- `ENCRYPTION_HEADER_MISMATCH`
+- `OBJECT_LOCK_UNSUPPORTED`
+- `PRESIGNED_EXPIRY_MISMATCH`
+- `LIST_PAGINATION_TOKEN_MISSING`
+- `DELETE_MARKER_BEHAVIOR_MISMATCH`
+- `CONSISTENCY_MODEL_MISMATCH`
+- `AUTHZ_CONTEXT_REVIEW_REQUIRED`
+- `OWNERSHIP_CONTROLS_MISMATCH`
+- `REQUESTER_PAYS_MISMATCH`
+- `LIFECYCLE_NOT_TESTED`
+
+The generated summary correctly elevated the highest-risk questions:
+
+- Which workflows rely on server-side copy rather than app-side read/write?
+- Which object tags are required by application logic?
+- Are ACLs required or incidental?
+- Is `versionId` behavior required by application logic or operations tooling?
+- What multipart size ranges and part sizes are used?
+- Do external workflows rely on presigned URLs?
+- Which browser origins, methods, and headers must work?
+- Do clients rely on `If-Match` or `If-None-Match`?
+- Do clients rely on partial reads?
+- Which metadata headers are used for routing or validation?
+
+This is a cutover-risk conversation guide generated from observed storage behavior,
+with each open decision tied to an owner role and related probe evidence.
+
+## Personas
+
+The most important personas are:
+
+- Executive sponsor: accountable for migration outcome, risk, spend, and timing.
+- Migration program manager: owns cutover schedule, go/no-go gates, and stakeholder
+  coordination.
+- Storage architect: owns object-storage platform design, target endpoint selection,
+  and compatibility interpretation.
+- Platform engineering lead: owns shared infrastructure standards and repeatable
+  runbooks.
+- Application owner: owns application behavior and business impact.
+- Application developer or SDK owner: owns code paths that use object storage.
+- Web product owner: owns browser upload/download user journeys.
+- Data platform owner: owns multipart ingestion, lake layout, listing, and downstream
+  processing.
+- Backup/archive owner: owns archive, restore, retention, and recovery workflows.
+- Compliance or records lead: owns retention, legal hold, WORM, audit, and evidence.
+- Security architect: owns IAM, ownership controls, ACL posture, encryption, and
+  data-exposure risk.
+- Support operations lead: owns recovery tooling, object-version investigations, and
+  incident response.
+- Partner pre-sales architect: owns discovery, technical qualification, and credible
+  customer-facing findings.
+- Customer success or delivery lead: owns handoff from pre-sales assessment to
+  remediation and deployment.
+
+## Top Business Stories
+
+### 1. Prevent a Failed Object-Storage Cutover
+
+Personas: migration program manager, storage architect, application owner, executive
+sponsor, partner pre-sales architect.
+
+Story: A migration team has already proven that sample objects can be copied to a
+target endpoint. The executive sponsor wants to approve the cutover window. The
+storage architect runs `s3-compat-replay` against observed usage logs and a target
+scratch bucket. The generated plan does not merely test PUT and GET; it probes the
+semantics the application actually used. The result shows blockers in CORS,
+presigned URLs, multipart completion, metadata, tags, versioning, and server-side
+copy.
+
+Business impact: the team avoids entering a cutover window with false confidence.
+Instead of discovering failures during production migration, they have an ordered
+remediation list and app-owner questions. The ROI comes from avoiding rollback,
+weekend bridge time, customer-impacting application failures, and emergency
+engineering work. This is credible because the fresh output produced 16 blockers and
+9 review items from observed workload semantics.
+
+### 2. Protect Browser Upload and Download Flows
+
+Personas: web product owner, application owner, frontend lead, storage architect,
+customer support lead.
+
+Story: A browser-facing application relies on presigned PUT/GET URLs and CORS
+headers. Object copy tests pass, but real users interact through browsers, not
+internal scripts. The tool's generated input included CORS origins, methods, request
+headers, metadata headers, and presigned expiration behavior. The simulated target
+returned multiple `CORS_PREFLIGHT_MISMATCH` results plus `PRESIGNED_URL_FAILED` and
+`PRESIGNED_EXPIRY_MISMATCH`.
+
+Business impact: this story has high ROI because browser failures are often found
+late, are visible to external users, and are easy to misdiagnose as frontend defects.
+The tool gives the web product owner and storage architect a concrete compatibility
+checklist before users are exposed.
+
+### 3. Keep Data Lake and Large-Ingest Pipelines Running
+
+Personas: data platform owner, storage architect, application developer, operations
+lead.
+
+Story: A data lake or ingestion system writes large partitioned objects and depends
+on multipart upload, list pagination, consistency, and sometimes range reads. The
+fresh fixture included multipart operations, large-object classes, list behavior,
+and pagination expectations. The simulated output flagged
+`MULTIPART_COMPLETE_FAILED`, `LIST_PAGINATION_TOKEN_MISSING`, and
+`CONSISTENCY_MODEL_MISMATCH`.
+
+Business impact: a target endpoint can pass small object tests while failing
+production ingest behavior. Catching this early protects downstream analytics,
+batch-processing windows, and operational credibility. The ROI is avoided pipeline
+interruption and avoided rework in data ingestion code.
+
+### 4. Validate Retention and Legal-Hold Feasibility Before Regulated Workloads Move
+
+Personas: compliance lead, records manager, backup/archive owner, storage architect,
+security architect.
+
+Story: A regulated retention workflow uses object versioning, retention periods, and
+legal holds. The input fixture modeled Object Lock and governance retention. The
+output flagged `OBJECT_LOCK_UNSUPPORTED` and versioning-related risk. The generated
+questions ask which retention and legal-hold behaviors are required, not merely
+whether the target can store bytes.
+
+Business impact: this is one of the strongest ROI stories because retention mistakes
+can create audit, records, and legal exposure. The tool does not claim compliance;
+it tells the team whether the technical behavior required for a compliant workflow
+appears compatible enough to continue assessment.
+
+### 5. Preserve Recovery and Support Tooling That Depends on Version IDs
+
+Personas: support operations lead, application owner, backup/archive owner, storage
+architect.
+
+Story: Support teams often rely on object versions, delete markers, and recovery
+tooling to investigate customer issues or restore accidental deletes. The fresh run
+included versioning and delete-marker behavior. The simulated output flagged
+`VERSIONING_TARGET_NOT_ENABLED` and `DELETE_MARKER_BEHAVIOR_MISMATCH`.
+
+Business impact: without this check, a migration can appear successful until the
+first restore, audit, or support investigation. The ROI comes from protecting
+operational recovery paths and reducing incident duration.
+
+### 6. Avoid Breaking Metadata and Tag-Driven Application Logic
+
+Personas: application owner, application developer, data governance lead, storage
+architect.
+
+Story: Some applications use object tags and metadata for routing, classification,
+retention class, downstream processing, or validation. The input fixture included
+object tags and metadata headers. The simulated output flagged
+`TAGGING_ROUNDTRIP_FAILED` and `METADATA_ROUNDTRIP_FAILED`.
+
+Business impact: metadata and tag failures rarely show up in basic object-copy
+testing. They show up later as misrouted records, incorrect workflow behavior, or
+silent governance drift. The tool gives developers a precise place to inspect before
+production traffic moves.
+
+### 7. Modernize ACL and Ownership Behavior Without Surprising Applications
+
+Personas: security architect, platform engineering lead, storage architect,
+application owner.
+
+Story: Security teams often want bucket-owner-enforced controls and less reliance on
+legacy ACL behavior. Applications may still call ACL APIs or assume ACL results. The
+fresh run included ACL operations and ownership controls. The output flagged
+`ACL_UNSUPPORTED_OR_DISABLED` and `OWNERSHIP_CONTROLS_MISMATCH`.
+
+Business impact: this creates a controlled modernization path. The security architect
+can distinguish acceptable intentional hardening from application-breaking behavior.
+The ROI is lower migration risk and cleaner security posture.
+
+### 8. Expose Hidden SDK Assumptions Around Conditional and Range Requests
+
+Personas: application developer, SDK owner, support operations lead, storage
+architect.
+
+Story: Applications may rely on `If-Match`, `If-None-Match`, range reads, ETags,
+status codes, or error shapes. These assumptions are often buried in SDK behavior or
+library code. The fresh output flagged `CONDITIONAL_REQUEST_MISMATCH` and
+`RANGE_GET_MISMATCH`.
+
+Business impact: these mismatches can break resumable downloads, cache validation,
+media serving, partial content readers, and optimistic concurrency controls. The
+tool turns hidden SDK assumptions into explicit app-owner questions.
+
+### 9. Create a Partner-Ready Evidence Bundle Without Exposing Sensitive Details
+
+Personas: partner pre-sales architect, customer security lead, platform engineering
+lead, customer success lead.
+
+Story: A partner needs to discuss migration risk with a customer but cannot ask for
+raw logs, bucket names, account IDs, object keys, endpoints, presigned signatures, or
+credentials to be shared broadly. The repo creates strict-redacted case bundles and
+validates them before sharing. The fresh bundle validation passed.
+
+Business impact: this supports a scalable partner motion. The partner can escalate
+real evidence to specialists without violating data handling boundaries. The ROI is
+faster qualification, better technical trust, and fewer stalled assessments.
+
+### 10. Convert Discovery Interviews Into Evidence-Driven Questionnaires
+
+Personas: migration program manager, application owner, partner pre-sales architect,
+storage architect.
+
+Story: Traditional discovery depends on long interviews where application owners may
+not know every storage behavior their code uses. `s3-compat-replay` generates
+questions from observed features and mismatches. In the fresh run, questions focused
+on CORS headers, presigned URLs, server-side copy, tags, metadata, object lock,
+multipart, version IDs, delete markers, conditional requests, range reads, and
+consistency assumptions.
+
+Business impact: discovery becomes shorter, more concrete, and easier to validate.
+The ROI is reduced meeting time, fewer generic questionnaires, and better migration
+readiness decisions.
+
+### 11. Apply Workload-Specific Policy Packs Instead of One Generic Compatibility Bar
+
+Personas: platform engineering lead, storage architect, compliance lead, partner
+pre-sales architect.
+
+Story: A public-assets bucket, application-upload bucket, regulated-retention bucket,
+backup archive, and data lake should not be evaluated with identical severity.
+Policy packs let the organization define what is required for a workload pattern.
+The fresh `application-uploads` policy elevated CORS, metadata, presigned URL, and
+tag behavior as blockers.
+
+Business impact: this is how the tool becomes core technology rather than a generic
+summary generator. It lets teams encode compatibility policy and apply it
+consistently across assessments.
+
+### 12. Run Safe Live Probes That Conservative Teams Can Approve
+
+Personas: security architect, storage architect, platform operations lead, migration
+program manager.
+
+Story: Compatibility tools often fail organizational approval because they need broad
+credentials, read source data, or perform destructive operations. This repo is built
+around explicit safety gates: offline analysis first, synthetic scratch objects only,
+write/delete/ACL/multipart/Object Lock operations behind flags, no source-bucket
+reads, and cleanup manifests.
+
+Business impact: the safety model lowers adoption friction. Teams can start with
+offline analysis and only approve narrowly scoped live probes. The ROI is faster
+time-to-evidence and less risk during pre-sales or pre-migration work.
+
+### 13. Build a Defensible Compatibility Corpus Over Time
+
+Personas: product manager, field engineering lead, partner architect, storage
+architect.
+
+Story: Each strict-redacted case bundle can become part of a corpus. Over time, the
+organization learns which observed patterns predict which probe requirements,
+questions, and remediation paths. This does not require telemetry because customers
+or partners can choose to contribute sanitized bundles.
+
+Business impact: this is the strongest long-term defensibility story. The corpus
+improves policy packs, probe coverage, mismatch prioritization, demo data realism,
+and field playbooks. The ROI compounds because each assessment can improve the next
+one.
+
+## Why These Stories Have Real ROI
+
+The ROI is not a pricing claim. The tool does not estimate storage savings or migration
+cost. The ROI comes from avoided failure modes and accelerated decisions:
+
+- Avoiding failed cutover windows.
+- Avoiding rollback and emergency remediation.
+- Reducing generic discovery meetings.
+- Focusing app-owner questions on observed behavior.
+- Identifying target endpoint gaps before production traffic moves.
+- Protecting customer-facing browser flows.
+- Protecting large-object and data-ingest pipelines.
+- Reducing audit and retention uncertainty.
+- Creating redacted, reusable evidence for partner escalation.
+- Turning one-off assessments into a repeatable compatibility corpus.
+
+## Why This Is Core Technology, Not Just Reporting
+
+The defensible components are:
+
+1. Evidence normalization: converting logs, hints, configs, HTTP traces, and access
+   logs into a typed usage profile.
+
+2. Semantic feature taxonomy: identifying the object-storage behaviors that matter
+   to applications, not just counting API calls.
+
+3. Probe-plan compiler: generating a target-specific synthetic probe plan from
+   observed behavior.
+
+4. Safety contract: allowing live endpoint checks with synthetic objects, explicit
+   permissions, scratch-prefix controls, and cleanup evidence.
+
+5. Mismatch-to-business mapping: translating low-level API differences into business
+   risks and app-owner questions.
+
+6. Cutover decision package: separating evidence coverage, target semantic status,
+   cutover recommendation, owner questions, remediation queue, and safety gates.
+
+7. Policy packs: applying workload-specific severity, target status, and required
+   evidence rules.
+
+8. Redacted case bundles: enabling repeatable partner and field workflows without
+   leaking sensitive customer data.
+
+9. Corpus loop: allowing sanitized field cases to improve probes, policies,
+   synthetic data, and prioritization over time.
+
+10. Deterministic generator: creating regression fixtures that cover real-world
+   semantic combinations and prevent product drift.
+
+11. Validation gates: schema validation, assessment output, strict redaction, and
+    tests make the artifact trustworthy.
+
+## Realism Assessment
+
+The generated input is realistic because it includes diverse workload patterns,
+operation families, request hints, HTTP/access-log context, bucket configuration, and
+policy context. It models the behaviors that often decide whether an S3-compatible
+endpoint change is safe for an application.
+
+The generated output is realistic because it does not declare broad compatibility
+from basic object operations. It surfaces blockers and review items that would
+matter in real migration planning:
+
+- browser access
+- external links
+- large-object ingest
+- retention controls
+- object version behavior
+- metadata and tag logic
+- security posture
+- pagination
+- consistency
+- lifecycle limitations
+
+The most important limitation is that the current demo results are simulated. The
+real business workflow is to replace the simulated target output with live probes
+against a target scratch bucket.
+
+## Remaining Gaps and Risk Boundaries
+
+The repo is strong, but the demo should be presented with these boundaries:
+
+- Simulated results are not endpoint certification.
+- CloudTrail data events are not complete HTTP transcripts.
+- CloudTrail may omit headers, body details, and SDK-level behavior.
+- Offline bucket config is user-supplied and must be trusted or independently
+  collected.
+- Lifecycle behavior is static-review only; time-based behavior is not proven.
+- Performance, throughput, latency under load, and cost are not benchmarked.
+- The tool does not prove IAM policy equivalence.
+- The tool does not migrate data.
+- The tool does not verify backup correctness.
+- The tool does not prove application business criticality.
+- The tool does not replace application integration testing.
+- The corpus value depends on real redacted case contributions over time.
+
+These are acceptable boundaries. They keep the product credible and focused.
+
+## Bottom Line
+
+The strongest business positioning for `s3-compat-replay` is:
+
+> A local-first semantic compatibility preflight that turns observed S3-style object
+> storage behavior into safe target probes, concrete mismatch evidence, a cutover
+> decision brief, and owner-specific remediation questions before migration cutover.
+
+That positioning is credible because the generated input covers real-world object
+storage semantics, the code implements a complete evidence-to-probe-to-decision
+pipeline, and the generated output highlights failures that would have clear business
+impact if discovered during production migration rather than before it.

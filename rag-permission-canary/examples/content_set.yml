@@ -1,0 +1,58 @@
+content_set_id: simple_hr_finance_canary
+content_set_version: 1
+description: Synthetic content set for permission regression testing.
+documents:
+  - doc_id: doc_hr_001
+    title: HR Benefits Plan 2026
+    collection: hr
+    sensitivity: internal
+    metadata:
+      department: hr
+      record_type: benefits
+      region: example-region
+    body: |
+      The HR benefits plan includes CANARY_HR_ALPHA.
+      Dental coverage changes are described in section HR-17.
+      The employee assistance program code is HR-EAP-2026.
+    canaries:
+      - canary_id: canary_hr_alpha
+        type: exact_span
+        text: CANARY_HR_ALPHA
+        description: Unique HR canary token.
+      - canary_id: canary_hr_eap_code
+        type: exact_span
+        text: HR-EAP-2026
+        description: HR program code.
+  - doc_id: doc_fin_001
+    title: Finance Forecast Draft
+    collection: finance
+    sensitivity: restricted
+    metadata:
+      department: finance
+      record_type: forecast
+      region: example-region
+    body: |
+      The finance forecast draft includes CANARY_FINANCE_BRAVO.
+      The confidential margin scenario is MARGIN-SCENARIO-42.
+    canaries:
+      - canary_id: canary_finance_bravo
+        type: exact_span
+        text: CANARY_FINANCE_BRAVO
+      - canary_id: canary_margin_scenario
+        type: exact_span
+        text: MARGIN-SCENARIO-42
+  - doc_id: doc_public_001
+    title: Public Product FAQ
+    collection: public
+    sensitivity: public
+    metadata:
+      department: product
+      record_type: faq
+      region: example-region
+    body: |
+      The product FAQ includes CANARY_PUBLIC_CHARLIE.
+      Standard support hours are 9 to 5 local time.
+    canaries:
+      - canary_id: canary_public_charlie
+        type: exact_span
+        text: CANARY_PUBLIC_CHARLIE

@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dr-prereq-lint"
+version = "0.1.0"
+description = "Local-only recovery-set prerequisite linter using normalized DNS query evidence"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "dr-prereq-lint contributors" }
+]
+dependencies = [
+  "typer>=0.9",
+  "pydantic>=2",
+  "PyYAML>=6"
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=7"
+]
+
+[project.scripts]
+dr-prereq-lint = "dr_prereq_lint.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dr_prereq_lint = ["policy_packs/*.yml"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

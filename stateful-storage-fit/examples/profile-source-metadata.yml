@@ -1,0 +1,4 @@
+source_type: offline_user_supplied_yaml
+owner_team: platform-storage
+captured_by: local_operator
+notes: Synthetic metadata showing how to document profile provenance without provider-specific names.

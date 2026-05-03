@@ -1,0 +1,54 @@
+storage_classes:
+  - name: standard-rwo
+    display_name: Standard block-backed filesystem
+    access_modes:
+      - ReadWriteOnce
+    volume_modes:
+      - Filesystem
+    storage_kind: block
+    performance_tier: standard
+    max_size_gib: 2048
+    supports_expansion: true
+    supports_snapshots: true
+
+  - name: fast-rwo
+    display_name: Fast block-backed filesystem
+    access_modes:
+      - ReadWriteOnce
+    volume_modes:
+      - Filesystem
+    storage_kind: block
+    performance_tier: fast
+    max_size_gib: 4096
+    supports_expansion: true
+    supports_snapshots: true
+
+  - name: shared-rwx
+    display_name: Shared file storage
+    access_modes:
+      - ReadWriteMany
+    volume_modes:
+      - Filesystem
+    storage_kind: file
+    performance_tier: standard
+    max_size_gib: 8192
+    supports_expansion: true
+    supports_snapshots: false
+
+  - name: raw-block-rwo
+    display_name: Raw block volume
+    access_modes:
+      - ReadWriteOnce
+    volume_modes:
+      - Block
+    storage_kind: block
+    performance_tier: fast
+    max_size_gib: 4096
+    supports_expansion: false
+    supports_snapshots: false
+
+performance_tiers:
+  standard: 1
+  fast: 2
+  low_latency: 3
+

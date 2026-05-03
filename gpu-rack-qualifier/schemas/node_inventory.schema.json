@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gpu-rack-qualifier/node_inventory.schema.json",
+  "title": "gpu-rack-qualifier node inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cluster_id": {"type": ["string", "null"]},
+    "rack_id": {"type": ["string", "null"]},
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gpu_count": {"type": ["integer", "null"], "minimum": 0},
+        "gpu_product_name_regex": {"type": ["string", "null"]},
+        "driver_version": {"type": ["string", "null"]},
+        "cuda_version": {"type": ["string", "null"]},
+        "vbios_consistent_within_node": {"type": ["boolean", "null"]},
+        "mig_mode": {"type": ["string", "null"]},
+        "ecc_mode": {"type": ["string", "null"]}
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string"},
+          "rack": {"type": ["string", "null"]},
+          "rack_position": {"type": ["string", "null"]},
+          "switch_group": {"type": ["string", "null"]},
+          "fabric_group": {"type": ["string", "null"]},
+          "expected_role": {"type": "array", "items": {"type": "string"}},
+          "expected_gpu_count": {"type": ["integer", "null"], "minimum": 0},
+          "expected_nic_count": {"type": ["integer", "null"], "minimum": 0},
+          "expected_features": {"type": "array", "items": {"type": "string"}},
+          "maintenance_window": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

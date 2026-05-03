@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/cabinet-burst-envelope/cabinet_profile.schema.json",
+  "title": "Cabinet Profile",
+  "type": "object",
+  "required": ["cabinet_id"],
+  "properties": {
+    "cabinet_id": {"type": "string"},
+    "display_name": {"type": "string"},
+    "site_policy_id": {"type": "string"},
+    "electrical": {
+      "type": "object",
+      "properties": {
+        "usable_sustained_kw": {"type": "number", "minimum": 0},
+        "usable_burst_kw": {"type": "number", "minimum": 0},
+        "trip_risk_kw": {"type": "number", "minimum": 0},
+        "redundancy_mode": {"enum": ["SINGLE", "A_B_SHARED", "A_B_REDUNDANT", "A_B_NON_REDUNDANT", "UNKNOWN"]},
+        "require_single_feed_survival": {"type": "boolean"},
+        "feed_limits": {"type": "array"}
+      }
+    },
+    "thermal": {
+      "type": "object",
+      "properties": {
+        "inlet_warning_c": {"type": "number"},
+        "inlet_critical_c": {"type": "number"},
+        "require_top_middle_bottom": {"type": "boolean"},
+        "max_thermal_extrapolation_kw": {"type": "number", "minimum": 0},
+        "thermal_model_required_for_burst": {"type": "boolean"}
+      }
+    },
+    "guardbands": {"type": "object"},
+    "sales_policy": {"type": "object"}
+  },
+  "additionalProperties": true
+}

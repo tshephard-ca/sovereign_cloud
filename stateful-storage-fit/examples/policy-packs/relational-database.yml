@@ -1,0 +1,17 @@
+name: relational-database
+version: "1.0"
+workload_family: relational_database
+description: Conservative thresholds for database-like workloads.
+threshold_overrides:
+  latency_medium_await_ms: 8
+  latency_high_await_ms: 18
+  db_requires_fast_if_latency_high: true
+  db_prefers_block_storage: true
+required_evidence:
+  - df
+  - mount
+  - iostat
+  - ps
+reason_text:
+  DB_PROCESS_DETECTED: Database-like process evidence increases the importance of storage latency and write durability review.
+

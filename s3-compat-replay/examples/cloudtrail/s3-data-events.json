@@ -1,0 +1,111 @@
+{
+  "Records": [
+    {
+      "eventVersion": "1.09",
+      "eventTime": "2026-01-01T00:00:00Z",
+      "eventSource": "s3-compatible.example.invalid",
+      "eventName": "PutObject",
+      "region": "us-east-1",
+      "sourceIPAddress": "192.0.2.10",
+      "userAgent": "example-sdk/1.0",
+      "requestParameters": {
+        "bucketName": "source-bucket-example",
+        "key": "documents/2026/01/customer-12345.pdf",
+        "x-amz-server-side-encryption": "AES256"
+      },
+      "responseElements": {
+        "x-amz-request-id": "req-put"
+      },
+      "additionalEventData": {
+        "SignatureVersion": "SigV4"
+      },
+      "readOnly": false,
+      "resources": [
+        {
+          "ARN": "arn:example:s3:::source-bucket-example/documents/2026/01/customer-12345.pdf"
+        }
+      ],
+      "requestID": "req-put",
+      "eventID": "event-put"
+    },
+    {
+      "eventVersion": "1.09",
+      "eventTime": "2026-01-01T00:01:00Z",
+      "eventSource": "s3-compatible.example.invalid",
+      "eventName": "HeadObject",
+      "region": "us-east-1",
+      "sourceIPAddress": "192.0.2.10",
+      "userAgent": "example-sdk/1.0",
+      "requestParameters": {
+        "bucketName": "source-bucket-example",
+        "key": "documents/2026/01/customer-12345.pdf"
+      },
+      "responseElements": {},
+      "additionalEventData": {
+        "SignatureVersion": "SigV4"
+      },
+      "readOnly": true,
+      "requestID": "req-head",
+      "eventID": "event-head"
+    },
+    {
+      "eventVersion": "1.09",
+      "eventTime": "2026-01-01T00:02:00Z",
+      "eventSource": "s3-compatible.example.invalid",
+      "eventName": "GetObject",
+      "region": "us-east-1",
+      "sourceIPAddress": "192.0.2.11",
+      "userAgent": "example-sdk/1.0",
+      "requestParameters": {
+        "bucketName": "source-bucket-example",
+        "key": "documents/2026/01/customer-12345.pdf"
+      },
+      "responseElements": {},
+      "additionalEventData": {
+        "SignatureVersion": "SigV4"
+      },
+      "readOnly": true,
+      "requestID": "req-get",
+      "eventID": "event-get"
+    },
+    {
+      "eventVersion": "1.09",
+      "eventTime": "2026-01-01T00:03:00Z",
+      "eventSource": "s3-compatible.example.invalid",
+      "eventName": "ListObjectsV2",
+      "region": "us-east-1",
+      "sourceIPAddress": "192.0.2.12",
+      "userAgent": "example-sdk/1.0",
+      "requestParameters": {
+        "bucketName": "source-bucket-example",
+        "prefix": "documents/2026/01/",
+        "delimiter": "/",
+        "maxKeys": 1000
+      },
+      "responseElements": {},
+      "additionalEventData": {},
+      "readOnly": true,
+      "requestID": "req-list",
+      "eventID": "event-list"
+    },
+    {
+      "eventVersion": "1.09",
+      "eventTime": "2026-01-01T00:04:00Z",
+      "eventSource": "s3-compatible.example.invalid",
+      "eventName": "PutObjectTagging",
+      "region": "us-east-1",
+      "sourceIPAddress": "192.0.2.13",
+      "userAgent": "example-sdk/1.0",
+      "requestParameters": {
+        "bucketName": "source-bucket-example",
+        "key": "documents/2026/01/customer-12345.pdf",
+        "tagging": "environment=test&app=orders"
+      },
+      "responseElements": {},
+      "additionalEventData": {},
+      "readOnly": false,
+      "requestID": "req-tag",
+      "eventID": "event-tag"
+    }
+  ]
+}

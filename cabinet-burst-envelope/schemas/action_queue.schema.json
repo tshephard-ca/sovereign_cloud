@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/cabinet-burst-envelope/action_queue.schema.json",
+  "title": "Cabinet Action Queue",
+  "type": "object",
+  "required": ["schema_version", "tool_version", "cabinet_id", "review_lane", "actions"],
+  "properties": {
+    "schema_version": {"const": "cabinet-burst-envelope.action_queue.v1"},
+    "tool_version": {"type": "string"},
+    "cabinet_id": {"type": "string"},
+    "review_lane": {"enum": ["READY_FOR_FACILITY_REVIEW", "NEEDS_REMEDIATION", "STOP_EXPANSION_DISCUSSION", "COLLECT_EVIDENCE"]},
+    "actions": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}

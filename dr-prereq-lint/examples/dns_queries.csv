@@ -1,0 +1,9 @@
+timestamp,client_ip,client_name,qname,qtype,rcode,answer_names,answer_ips,resolver_name,resolver_ip,source_file
+2026-04-29T08:00:00Z,10.0.1.10,app01.apps.example.internal,_ldap._tcp.dc._msdcs.corp.example.internal,SRV,NOERROR,dc01.corp.example.internal,10.0.0.20,dns01.example.internal,10.0.0.10,synthetic.csv
+2026-04-29T08:05:00Z,10.0.1.10,app01.apps.example.internal,_kerberos._tcp.corp.example.internal,SRV,NOERROR,dc01.corp.example.internal,10.0.0.20,dns01.example.internal,10.0.0.10,synthetic.csv
+2026-04-29T08:10:00Z,10.0.1.10,app01.apps.example.internal,_gc._tcp.corp.example.internal,SRV,NOERROR,dc01.corp.example.internal,10.0.0.20,dns01.example.internal,10.0.0.10,synthetic.csv
+2026-04-29T08:20:00Z,10.0.1.10,app01.apps.example.internal,sql01.apps.example.internal,A,NOERROR,,10.0.2.30,dns01.example.internal,10.0.0.10,synthetic.csv
+2026-04-29T08:21:00Z,10.0.1.11,app02.apps.example.internal,sql01.apps.example.internal,A,NOERROR,,10.0.2.30,dns01.example.internal,10.0.0.10,synthetic.csv
+2026-04-29T08:30:00Z,10.0.1.10,app01.apps.example.internal,files01.apps.example.internal,A,NOERROR,,10.0.3.40,dns01.example.internal,10.0.0.10,synthetic.csv
+2026-04-29T08:40:00Z,10.0.1.10,app01.apps.example.internal,license01.apps.example.internal,A,NOERROR,,10.0.4.50,dns01.example.internal,10.0.0.10,synthetic.csv
+2026-04-29T09:00:00Z,10.0.9.99,unmapped.example.internal,db01.apps.example.internal,A,NOERROR,,10.0.2.31,dns01.example.internal,10.0.0.10,synthetic.csv

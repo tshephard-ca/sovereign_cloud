@@ -1,0 +1,1436 @@
+# stateful-storage-fit Demo And Business-Story Deep Dive
+
+Generated: 2026-05-01
+
+Target repository: `stateful-storage-fit`
+
+Purpose of this artifact: explain the highest-value business stories this repository can support by analyzing the local generated input, implementation code, generated outputs, tests, and current public guidance about Kubernetes persistent storage and stateful workloads. This is a business-value and technical-demo brief, not a migration plan, pricing model, benchmark, or compliance certificate.
+
+## Executive Thesis
+
+`stateful-storage-fit` is best positioned as a deterministic storage preflight and evidence engine for VM-based stateful workloads that may move to Kubernetes-compatible persistent storage.
+
+The business problem is practical: many modernization programs can containerize stateless services quickly, but stateful workloads stall because nobody has a compact, defensible answer to questions like:
+
+- Does this VM workload need `ReadWriteOnce` or `ReadWriteMany`?
+- Is the workload using block-backed filesystem storage, shared file storage, or raw block?
+- Is observed storage latency low enough to treat the workload as a standard fit, or should it trigger a deeper validation?
+- Does the target platform profile actually contain a storage class that can satisfy the observed access mode, volume mode, size, storage kind, and performance tier?
+- Which missing facts should the app owner or platform engineer provide next?
+
+The repository answers those questions without connecting to clusters, creating PVCs, calling external services, invoking proprietary tools, or pretending to migrate the app. It parses ordinary Linux text evidence, normalizes storage behavior, solves the inferred requirement against a user-supplied storage profile, and produces PASS / REVIEW / FAIL decisions with reason codes, blockers, evidence questions, and governance artifacts.
+
+The core business value is not "generate a report." The value is reducing high-cost uncertainty before a stateful workload consumes migration, platform engineering, database, and storage-architecture time.
+
+## External Context From Web Research
+
+The repo's premise is aligned with current Kubernetes and cloud-native storage guidance:
+
+1. Kubernetes Persistent Volumes
+   Source: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
+
+   Kubernetes documentation states that managing storage is a distinct problem from managing compute. PersistentVolumeClaims request storage with size and access modes. PersistentVolumes and StorageClasses abstract how storage is provided. The same source defines access modes such as `ReadWriteOnce`, `ReadWriteMany`, and `ReadWriteOncePod`, and describes volume modes such as `Filesystem` and `Block`.
+
+   Why it matters here: the repo's main decision fields map directly onto those Kubernetes primitives: access mode, volume mode, size, storage kind, and performance tier.
+
+2. Kubernetes StorageClasses
+   Source: https://kubernetes.io/docs/concepts/storage/storage-classes/
+
+   Kubernetes documentation explains that a StorageClass lets administrators describe the storage classes they offer, including quality-of-service levels, backup policies, or other policies determined by administrators. Kubernetes itself is intentionally unopinionated about what classes represent.
+
+   Why it matters here: `stateful-storage-fit` correctly requires a user-supplied storage profile. It does not invent platform knowledge. The profile is the contract.
+
+3. Kubernetes Volume Snapshots
+   Source: https://kubernetes.io/docs/concepts/storage/volume-snapshots/
+
+   Kubernetes volume snapshots rely on snapshot API objects and CSI support. Snapshot support is not automatically available for every storage option.
+
+   Why it matters here: the repo treats snapshot support as a profile capability and a preference/risk signal, not as an assumed platform feature.
+
+4. CNCF Annual Cloud Native Survey
+   Source: https://www.cncf.io/reports/the-cncf-annual-cloud-native-survey/
+
+   CNCF reports that Kubernetes is now a production foundation for many organizations, with the 2025 survey page stating that 82% of container users run Kubernetes in production.
+
+   Why it matters here: persistent storage preflight matters because Kubernetes is no longer experimental infrastructure. Stateful fit issues affect real production modernization programs.
+
+5. CNCF Data on Kubernetes Day
+   Source: https://www.cncf.io/blog/2024/09/20/kubecon-cloudnativecon-north-america-2024-co-located-event-deep-dive-data-on-kubernetes-day/
+
+   CNCF describes how running data workloads on Kubernetes was once considered difficult, but has matured enough to support stateful workloads such as databases, streaming, AI/ML, analytics, and CI/CD.
+
+   Why it matters here: maturity does not eliminate fit risk. It increases the need for preflight tools that separate obvious fits, review cases, and profile gaps.
+
+6. Data on Kubernetes Community Survey Blog
+   Source: https://dok.community/blog/data-on-kubernetes-survey-contribute-to-the-collective-knowledge-of-our-community/
+
+   The Data on Kubernetes community highlights research around technology issues and trends for running data and stateful workloads on Kubernetes, and reports prior findings that many respondents see Kubernetes as ready for stateful workloads and connect data-on-Kubernetes work to business growth and productivity.
+
+   Why it matters here: the repo's calibration and outcome workflow is directionally right. Real business value requires outcome-linked cases, not only synthetic parser tests.
+
+7. CNCF / Fairwinds Kubernetes Benchmark Report summary
+   Source: https://www.cncf.io/blog/2024/01/26/2024-kubernetes-benchmark-report-the-latest-analysis-of-kubernetes-workloads/
+
+   CNCF's member-post summary notes that policy consistency, cost efficiency, reliability, and security remain major Kubernetes concerns, and that the benchmark analyzed more than 330,000 workloads.
+
+   Why it matters here: `stateful-storage-fit` fits the broader pattern of automated preflight and policy checking. Storage fit is one of the areas where platform teams need repeatable, actionable signals.
+
+## What The Repo Actually Does
+
+The README defines `stateful-storage-fit` as a local-only storage preflight for one VM-based stateful workload.
+
+It reads ordinary Linux evidence:
+
+- `df`
+- `mount`
+- `fstab`
+- `iostat`
+- `ps`
+- optional `findmnt`
+- optional `lsblk`
+- optional `blkid`
+- optional LVM evidence
+- optional inode data
+- optional owner-declared path-purpose metadata
+
+It also reads a user-supplied storage profile describing target storage options:
+
+- storage class name
+- access modes
+- volume modes
+- storage kind
+- performance tier
+- max size
+- expansion support
+- snapshot support
+
+The repo then answers one narrow question:
+
+> Can this workload's observed storage shape plausibly fit one of the target PersistentVolume options?
+
+It explicitly does not:
+
+- migrate applications
+- generate Kubernetes manifests
+- create PVCs
+- inspect clusters
+- price storage
+- test application correctness
+- prove container readiness
+- infer every dependency
+- connect to live infrastructure
+- call external services
+- use proprietary tooling
+
+That boundary is a major part of its credibility.
+
+## Local Code Deep Dive
+
+### 1. Parsing And Evidence Collection
+
+The engine accepts text evidence and parses it through focused modules:
+
+- `parse_df.py`
+- `parse_mount.py`
+- `parse_fstab.py`
+- `parse_iostat.py`
+- `parse_processes.py`
+- `parse_extra.py`
+
+The local collector is optional. The core tool does not collect automatically. When explicitly run, the collector writes a bundle with a manifest, command statuses, checksums, redaction mode, and bundle fingerprint. That makes the evidence path inspectable.
+
+Business meaning: the tool can be handed to a workload owner or partner team without requiring credentials, cluster access, SSH, or proprietary clients.
+
+### 2. Mount And Process Classification
+
+The engine classifies candidate data mounts and process hints:
+
+- likely data mount
+- root-only storage view
+- shared or network filesystem
+- database-like process
+- stateful service process
+- file-server process
+- raw block hint
+
+Business meaning: this converts low-level VM text into storage-fit signals without pretending to perform full application discovery.
+
+### 3. Fit Rules
+
+`fit_rules.py` is the core decision layer.
+
+Important rule behavior:
+
+- Shared/network candidate data mounts infer `ReadWriteMany` and file storage.
+- Non-shared mounts default to `ReadWriteOnce`.
+- Database-like processes prefer block-backed filesystem storage unless shared filesystem evidence exists.
+- File-serving processes force human architecture review.
+- Raw block evidence changes or questions the required volume mode.
+- High latency on database or stateful process evidence recommends a faster performance tier.
+- Capacity risk is adjusted when otherwise compatible storage classes are too small.
+- Missing or uncertain evidence becomes warnings, missing data, review signals, and confidence reduction.
+- Blockers produce `FAIL`.
+- Matching storage class plus review signals produces `REVIEW`.
+- Matching storage class with low/medium risk and no review signals can produce `PASS`.
+
+Business meaning: this is a rules engine, not a model. The decision is deterministic and explainable.
+
+### 4. Deep Analysis
+
+`deep_analysis.py` builds a richer object around the simple PASS / REVIEW / FAIL result:
+
+- evidence graph
+- storage behavior fingerprint
+- enhanced storage requirements
+- storage class compatibility results
+- evidence questions
+- decision drivers
+
+Business meaning: the tool can serve both an executive triage view and an engineer's handoff artifact.
+
+### 5. Requirement Model
+
+`requirement_model.py` turns observations into a behavior fingerprint:
+
+- shared namespace dependency
+- writer topology
+- file-locking risk
+- sync-write sensitivity
+- latency sensitivity
+- throughput sensitivity
+- capacity growth risk
+- raw block likelihood
+- expansion need
+- snapshot consistency need
+- topology sensitivity
+- filesystem identity and permission assumption risk
+- evidence quality
+
+It then derives hard requirements, soft preferences, and unresolved requirements.
+
+Business meaning: this is the path from a simple CLI checker toward defensible core technology. It structures what is known, what is inferred, and what remains unresolved.
+
+### 6. Constraint Solver
+
+`constraint_solver.py` evaluates each storage class against the enhanced requirement:
+
+- access mode
+- volume mode
+- storage kind
+- size
+- performance tier
+- expansion preference
+- snapshot preference
+
+It returns matches, partial matches, rejections, hard failures, soft warnings, scores, and counterfactuals.
+
+Business meaning: this is a storage fit solver. It can explain why a class was rejected and what would have to change for it to match.
+
+### 7. Evidence Planner
+
+`evidence_planner.py` emits follow-up questions based on missing or risky facts:
+
+- Which paths contain durable application data?
+- Why is a shared filesystem mounted?
+- Does the workload require concurrent writers?
+- Is raw block truly required?
+- Is high iostat latency representative?
+- Which block device backs each data mount?
+- What is the expected capacity growth rate?
+- Does the workload require topology-specific placement?
+
+Business meaning: REVIEW decisions become an actionable assessment worklist rather than a dead end.
+
+### 8. Governance, Corpus, Calibration, And Quality Gates
+
+The repo includes:
+
+- `validate-bundle`
+- `validate-input-realism`
+- `validate-decision`
+- `quality-gate`
+- `profile-snapshot`
+- `create-case`
+- `validate-case`
+- `add-review`
+- `adjudicate-case`
+- `add-outcome`
+- `add-impact`
+- `evaluate-corpus`
+- `calibration-actions`
+- `business-impact-summary`
+- `audit-manifest`
+- `decision-diff`
+- `proprietary-scan`
+
+Business meaning: this is the part that prevents unsupported claims. Synthetic examples stay research-only. Calibration requires expert review and decisive storage-relevant outcomes.
+
+## Generated Input Deep Dive
+
+### Example Storage Profile
+
+The example storage profile contains four generic storage classes:
+
+1. `standard-rwo`
+
+   - access mode: `ReadWriteOnce`
+   - volume mode: `Filesystem`
+   - storage kind: block
+   - performance tier: standard
+   - max size: 2048 GiB
+   - expansion: true
+   - snapshots: true
+
+2. `fast-rwo`
+
+   - access mode: `ReadWriteOnce`
+   - volume mode: `Filesystem`
+   - storage kind: block
+   - performance tier: fast
+   - max size: 4096 GiB
+   - expansion: true
+   - snapshots: true
+
+3. `shared-rwx`
+
+   - access mode: `ReadWriteMany`
+   - volume mode: `Filesystem`
+   - storage kind: file
+   - performance tier: standard
+   - max size: 8192 GiB
+   - expansion: true
+   - snapshots: false
+
+4. `raw-block-rwo`
+
+   - access mode: `ReadWriteOnce`
+   - volume mode: `Block`
+   - storage kind: block
+   - performance tier: fast
+   - max size: 4096 GiB
+   - expansion: false
+   - snapshots: false
+
+This is a good demo input because it includes the storage choices that matter for many stateful conversations: ordinary block filesystem, faster block filesystem, shared file storage, and raw block.
+
+### Example Portfolio Input
+
+The example portfolio has three workloads:
+
+1. `vm1-database`
+
+   A synthetic relational database-like VM with ordinary block-backed filesystem data.
+
+2. `vm2-shared-filesystem`
+
+   A synthetic shared filesystem / file-serving VM.
+
+3. `vm3-db-latency-risk`
+
+   A synthetic database-like VM with high observed storage latency risk.
+
+This portfolio is small, but it covers the three most compelling business patterns:
+
+- easy fit
+- architecture review because of shared filesystem behavior
+- performance review because of latency-sensitive database behavior
+
+### Example Corpus Input
+
+The corpus cases encode expected fit status and expected requirements:
+
+- `vm1-database` expects `PASS`, `ReadWriteOnce`, `Filesystem`, block.
+- `vm2-shared-filesystem` expects `REVIEW`, `ReadWriteMany`, `Filesystem`, file.
+- `vm3-db-latency-risk` expects `REVIEW`, `ReadWriteOnce`, `Filesystem`, block, with fast storage recommended.
+
+The corpus evaluation output reports decision accuracy of `1.0` for the synthetic examples, but that is correctly treated as regression evidence, not real-world validation.
+
+### Real-World Generator Audit Input
+
+The current generated audit bundle under `out/current-realworld-generator-audit/` is realistic in a different way: it demonstrates input quality scoring and honest gating.
+
+Observed bundle validation:
+
+- valid: true
+- core completeness score: `1.0`
+- topology completeness score: `0.429`
+- application evidence score: `0.5`
+- redaction preservation score: `1.0`
+- overall bundle quality score: `0.811`
+- failed or empty optional topology outputs: `blkid`, `pvs`, `vgs`, `lvs`
+
+Input realism warnings:
+
+- `DECLARED_APP_PATH_NOT_OBSERVED_IN_MOUNT_OUTPUT`
+- `IOSTAT_SAMPLE_SHORT_FOR_CALIBRATION`
+- `PROFILE_APPEARS_TO_BE_EXAMPLE_GENERIC`
+- `TOPOLOGY_EVIDENCE_LOW`
+
+This is important. The generator did not manufacture high confidence. It produced a valid bundle and then correctly flagged why the bundle should not be used as calibration-grade proof.
+
+### Full-Coverage Lab Input
+
+The full-coverage generated lab contains:
+
+- 100 cases
+- workload families:
+  - relational database: 25
+  - shared filesystem: 25
+  - file server: 15
+  - search/logging: 15
+  - queue/streaming: 10
+  - generic stateful app: 10
+
+This is strong regression coverage for the engine. It is not real-world truth because generated cases are intentionally excluded from calibration readiness.
+
+### Gap-Closure Lab Input
+
+The latest gap-closure lab contains:
+
+- 35 cases
+- 85 tracked gaps
+- 85 closed gaps
+- fit status counts:
+  - PASS: 20
+  - REVIEW: 11
+  - FAIL: 4
+
+Observed reason-code coverage includes:
+
+- `APP_DATA_PATH_DECLARED`
+- `BLOCK_STORAGE_PREFERRED`
+- `CAPACITY_EXCEEDS_AVAILABLE_PROFILE`
+- `CAPACITY_RISK_HIGH`
+- `CAPACITY_RISK_MEDIUM`
+- `DATA_MOUNT_DETECTED`
+- `DB_PROCESS_DETECTED`
+- `FILE_STORAGE_REQUIRED`
+- `FINDMNT_CONFIRMED_MOUNT`
+- `INODE_PRESSURE_RISK`
+- `IOSTAT_DEVICE_MAPPING_UNCERTAIN`
+- `IOSTAT_MISSING`
+- `IOSTAT_PARSE_FAILED`
+- `LATENCY_RISK_HIGH`
+- `LOW_LATENCY_STORAGE_RECOMMENDED`
+- `MOUNT_OPTIONS_REVIEW_REQUIRED`
+- `NO_STORAGE_CLASS_MATCH`
+- `RAW_BLOCK_REQUIRED_NO_PROFILE`
+- `ROOT_ONLY_STORAGE_VIEW`
+- `RWX_REQUIRED`
+- `SHARED_FILESYSTEM_REQUIRED_NO_RWX_PROFILE`
+
+Observed blockers include:
+
+- `CAPACITY_EXCEEDS_AVAILABLE_PROFILE`
+- `NO_STORAGE_CLASS_MATCH`
+- `RAW_BLOCK_REQUIRED_NO_PROFILE`
+- `SHARED_FILESYSTEM_REQUIRED_NO_RWX_PROFILE`
+
+This is useful because it proves the repo exercises both ordinary and hard edge cases.
+
+## Generated Output Deep Dive
+
+### Workload 1: Database Fit
+
+Output file: `out/fit.json`
+
+Result:
+
+- fit status: `PASS`
+- recommended storage class: `standard-rwo`
+- required access mode: `ReadWriteOnce`
+- required volume mode: `Filesystem`
+- preferred storage kind: `block`
+- storage request: `125 GiB`
+- capacity risk: `LOW`
+- latency risk: `LOW`
+- confidence: `MEDIUM`
+- blockers: none
+- warnings: none
+- matched classes: `standard-rwo`, `fast-rwo`
+- rejected classes:
+  - `raw-block-rwo`: volume mode unsupported
+  - `shared-rwx`: access mode unsupported, storage kind mismatch
+
+Reason codes:
+
+- `RWO_REQUIRED`
+- `DB_PROCESS_DETECTED`
+- `BLOCK_STORAGE_PREFERRED`
+- `DATA_MOUNT_DETECTED`
+- `LATENCY_RISK_LOW`
+- `CAPACITY_RISK_LOW`
+- `STORAGE_CLASS_MATCH`
+
+Business interpretation:
+
+This is a good candidate for a basic stateful storage fit discussion. It is not a migration plan, but it indicates that the observed VM storage shape plausibly maps to a standard RWO block-backed filesystem class.
+
+### Workload 2: Shared Filesystem / File Server
+
+Output file: `out/vm2-fit.json`
+
+Result:
+
+- fit status: `REVIEW`
+- recommended storage class: `shared-rwx`
+- required access mode: `ReadWriteMany`
+- required volume mode: `Filesystem`
+- preferred storage kind: `file`
+- storage request: `375 GiB`
+- capacity risk: `LOW`
+- latency risk: `LOW`
+- confidence: `HIGH`
+- matched class: `shared-rwx`
+- file-server process detected: `smbd`
+
+Reason codes:
+
+- `SHARED_FS_DETECTED`
+- `RWX_REQUIRED`
+- `FILE_STORAGE_REQUIRED`
+- `FILE_SERVER_PROCESS_DETECTED`
+- `HUMAN_ARCHITECTURE_REVIEW_REQUIRED`
+- `DATA_MOUNT_DETECTED`
+- `LATENCY_RISK_LOW`
+- `CAPACITY_RISK_LOW`
+- `STORAGE_CLASS_MATCH`
+
+Business interpretation:
+
+This is not a simple "yes." Even with a matching RWX file storage class, file-serving behavior requires human review. That is the correct business posture: a shared filesystem may imply concurrent writers, lock semantics, user identity/permissions, client protocol expectations, or architectural coupling that cannot be solved by selecting a PVC class.
+
+### Workload 3: Database With High Latency Risk
+
+Output file: `out/vm3-fit.json`
+
+Result:
+
+- fit status: `REVIEW`
+- recommended storage class: `fast-rwo`
+- required access mode: `ReadWriteOnce`
+- required volume mode: `Filesystem`
+- preferred storage kind: `block`
+- storage request: `313 GiB`
+- capacity risk: `LOW`
+- latency risk: `HIGH`
+- confidence: `HIGH`
+- matched class: `fast-rwo`
+- observed max await: `24.8 ms`
+- observed max utilization: `72.0%`
+
+Reason codes:
+
+- `RWO_REQUIRED`
+- `DB_PROCESS_DETECTED`
+- `BLOCK_STORAGE_PREFERRED`
+- `DATA_MOUNT_DETECTED`
+- `LATENCY_RISK_HIGH`
+- `CAPACITY_RISK_LOW`
+- `FAST_STORAGE_RECOMMENDED`
+- `STORAGE_CLASS_MATCH`
+
+Business interpretation:
+
+This is a classic "do not greenlight casually" case. A fast RWO block-backed class may satisfy the inferred requirement, but the observed latency risk means the next step should be deeper performance validation, not a confident migration go-ahead.
+
+### Portfolio Output
+
+Output file: `out/portfolio.json`
+
+Portfolio result:
+
+- workload count: 3
+- PASS: 1
+- REVIEW: 2
+- FAIL: 0
+
+Capability demand:
+
+- block: 2
+- fast block: 1
+- file: 1
+- RWO: 2
+- RWX: 1
+
+Top reason codes:
+
+- `DATA_MOUNT_DETECTED`: 3
+- `CAPACITY_RISK_LOW`: 3
+- `STORAGE_CLASS_MATCH`: 3
+- `RWO_REQUIRED`: 2
+- `DB_PROCESS_DETECTED`: 2
+- `BLOCK_STORAGE_PREFERRED`: 2
+- `SHARED_FS_DETECTED`: 1
+- `RWX_REQUIRED`: 1
+- `FILE_STORAGE_REQUIRED`: 1
+- `LATENCY_RISK_HIGH`: 1
+- `FAST_STORAGE_RECOMMENDED`: 1
+
+Business interpretation:
+
+This is where the tool becomes valuable for a platform team. It does not produce a migration wave plan, but it tells the platform owner that this small estate needs ordinary RWO block, one fast block case, and one RWX file case. That is exactly the type of pre-sales or early-discovery signal that prevents building the wrong platform capability.
+
+### Current Real-World Generator Audit Output
+
+Output file: `out/current-realworld-generator-audit/fit.json`
+
+Result:
+
+- fit status: `REVIEW`
+- recommended storage class: `fast-rwo`
+- required access mode: `ReadWriteOnce`
+- required volume mode: `Filesystem`
+- preferred storage kind: `unknown`
+- storage request: `3879 GiB`
+- capacity risk: `MEDIUM`
+- latency risk: `LOW`
+- confidence: `MEDIUM`
+- missing data: `iostat_device_mapping`
+- warnings:
+  - `NETWORK_FILESYSTEM_ON_NON_DATA_MOUNT`
+  - `IOSTAT_DEVICE_MAPPING_UNCERTAIN`
+  - `TOPOLOGY_EVIDENCE_LOW`
+
+Rejected classes:
+
+- `raw-block-rwo`: volume mode unsupported
+- `shared-rwx`: access mode unsupported
+- `standard-rwo`: max size too small
+
+Business interpretation:
+
+This is a credible generated real-world audit behavior: it finds a plausible fit in `fast-rwo`, but refuses to overclaim because topology evidence is incomplete, the target profile appears generic, and the size requirement pushes beyond the standard class. The right status is `REVIEW`.
+
+### Quality Gate Output
+
+Output file: `out/current-realworld-generator-audit/quality-gate.json`
+
+Result:
+
+- gate status: `REVIEW`
+- passed: false
+- issues:
+  - `TOPOLOGY_EVIDENCE_BELOW_GATE`
+  - `BUNDLE_QUALITY_BELOW_GATE`
+  - `GENERIC_PROFILE_BLOCKED_FOR_BUSINESS_REVIEW`
+- warnings:
+  - `CASE_HAS_NO_TRUSTED_LABEL`
+
+Business interpretation:
+
+This is one of the strongest parts of the repo. The tool produces a decision but blocks business-review overuse when evidence quality is not sufficient. That is how the project earns credibility with platform engineers and governance teams.
+
+### Business Impact Summary Output
+
+Output file: `out/current-realworld-generator-audit/business-impact-summary.json`
+
+Result:
+
+- case count: 1
+- claim status: `EVIDENCE_MISSING`
+- impact record count: 0
+- high-quality impact record count: 0
+- operational minutes delta: 60 against the supplied baseline
+
+Business interpretation:
+
+The workflow behaved correctly. It did not invent business impact from generated data. It requires real impact records before making real ROI claims.
+
+### Test Output
+
+I ran the local test suite:
+
+```text
+54 passed in 20.62s
+```
+
+That confirms the current repository state has passing regression coverage for the implemented parser, rules, workflow, governance, and gap-closure behavior.
+
+## Personas
+
+1. Platform Engineering Lead
+
+   Owns the Kubernetes platform and needs to know whether current storage classes can support the next wave of stateful workloads.
+
+2. Storage Architect
+
+   Owns storage capability, performance tiers, snapshots, expansion, topology, and shared filesystem options.
+
+3. Application Owner
+
+   Understands where durable data lives and whether a workload needs shared access, single-writer semantics, raw block, file locking, or growth headroom.
+
+4. Database Administrator
+
+   Cares about sync-write sensitivity, latency, backup/snapshot semantics, filesystem behavior, and operational supportability.
+
+5. File Services Owner
+
+   Cares about SMB/NFS-like behavior, concurrent clients, file locking, permissions, identity mapping, and RWX requirements.
+
+6. SRE / Operations Engineer
+
+   Needs repeatable local evidence, warnings, and follow-up questions before committing to deployment or pilot support.
+
+7. Migration Factory Lead
+
+   Needs to triage a portfolio without pretending to produce a complete wave plan.
+
+8. Pre-Sales / Solutions Engineer
+
+   Needs a fast, credible storage-fit conversation starter that can be run from ordinary exports and synthetic examples.
+
+9. Enterprise Architect
+
+   Needs to align application patterns with platform capabilities and avoid choosing a platform profile that cannot support the estate.
+
+10. Risk / Governance Lead
+
+   Needs evidence quality, data provenance, review status, and calibration boundaries.
+
+11. Finance / Capacity Planning Stakeholder
+
+   Needs non-pricing signals about capacity demand, fast storage demand, shared storage demand, and areas that need more sizing work.
+
+12. Partner Delivery Lead
+
+   Needs a handoff artifact that narrows expert review time and avoids sending consultants into assessment work blindly.
+
+## Top Business Stories
+
+### Story 1: "Stop Failed Stateful Pilots Before They Start"
+
+Personas:
+
+- Platform Engineering Lead
+- Application Owner
+- Storage Architect
+- SRE
+
+Scenario:
+
+A team wants to pilot a database workload on a Kubernetes-compatible platform. The app appears containerizable, but nobody has checked whether the current storage classes match the VM's storage behavior.
+
+What the repo does:
+
+- Parses VM storage and process evidence.
+- Infers RWO filesystem block storage.
+- Checks capacity and latency risk.
+- Solves against supplied storage classes.
+- Produces PASS / REVIEW / FAIL and a recommended class.
+
+Local evidence:
+
+- `vm1-database` produced `PASS`.
+- Required `ReadWriteOnce`, `Filesystem`, block.
+- Recommended `standard-rwo`.
+- Storage request was 125 GiB.
+- Capacity and latency risk were low.
+
+Business impact:
+
+- Avoids launching a pilot with unverified storage assumptions.
+- Lets platform and app teams move a simple fit forward quickly.
+- Keeps deeper experts focused on REVIEW and FAIL cases.
+
+Credible demo line:
+
+"This database-like workload has a plausible RWO block-backed filesystem fit, so it can move to the next technical assessment step without consuming a storage architecture escalation."
+
+### Story 2: "Find RWX/File Storage Requirements Before Platform Scope Is Finalized"
+
+Personas:
+
+- Platform Engineering Lead
+- Storage Architect
+- File Services Owner
+- Enterprise Architect
+
+Scenario:
+
+A modernization program scopes only block-backed RWO storage. Later, a file-serving workload is discovered that depends on shared filesystem semantics.
+
+What the repo does:
+
+- Detects shared/network filesystem evidence.
+- Infers `ReadWriteMany`.
+- Requires file storage.
+- Flags file-server process behavior.
+- Keeps the decision in REVIEW even if a matching RWX profile exists.
+
+Local evidence:
+
+- `vm2-shared-filesystem` produced `REVIEW`.
+- Required `ReadWriteMany`, `Filesystem`, file.
+- Recommended `shared-rwx`.
+- Detected `smbd`.
+- Reason codes included `SHARED_FS_DETECTED`, `RWX_REQUIRED`, `FILE_STORAGE_REQUIRED`, and `HUMAN_ARCHITECTURE_REVIEW_REQUIRED`.
+
+Business impact:
+
+- Prevents a platform design that omits RWX capability.
+- Forces early discussion of file locking, writer topology, and client behavior.
+- Reduces late-stage rework when shared storage shows up after budget or architecture decisions.
+
+Credible demo line:
+
+"This workload is not just another PVC. It appears to need shared filesystem behavior, so the platform scope must include RWX file storage or the workload needs redesign."
+
+### Story 3: "Catch Latency-Sensitive Database Risk Before Choosing Standard Storage"
+
+Personas:
+
+- DBA
+- Storage Architect
+- Platform Engineering Lead
+- Application Owner
+
+Scenario:
+
+A database workload fits RWO block storage by access mode and size, but observed storage latency suggests standard storage may be unsafe.
+
+What the repo does:
+
+- Parses `iostat`.
+- Detects high await/utilization risk.
+- Applies database-like process evidence.
+- Recommends a fast performance tier.
+- Keeps the result in REVIEW.
+
+Local evidence:
+
+- `vm3-db-latency-risk` produced `REVIEW`.
+- Required `ReadWriteOnce`, `Filesystem`, block.
+- Recommended `fast-rwo`.
+- Observed max await was 24.8 ms.
+- Observed max utilization was 72%.
+- Reason codes included `LATENCY_RISK_HIGH` and `FAST_STORAGE_RECOMMENDED`.
+
+Business impact:
+
+- Avoids picking a storage class that matches by API but fails operationally.
+- Gives the DBA and storage architect a clear reason to request a deeper performance test.
+- Prevents treating a short sample as a benchmark while still using it as a risk signal.
+
+Credible demo line:
+
+"The workload can probably use RWO block storage, but high observed latency moves it from PASS to REVIEW and points to fast storage plus deeper validation."
+
+### Story 4: "Turn A Small Portfolio Into Platform Capability Demand"
+
+Personas:
+
+- Platform Engineering Lead
+- Enterprise Architect
+- Migration Factory Lead
+- Capacity Planning Stakeholder
+
+Scenario:
+
+Leadership asks whether the platform is ready for a stateful modernization wave. The team has VM evidence but lacks a storage demand summary.
+
+What the repo does:
+
+- Runs portfolio mode across multiple offline workloads.
+- Summarizes PASS / REVIEW / FAIL counts.
+- Summarizes storage capability demand.
+- Lists top reason codes and blockers.
+
+Local evidence:
+
+- Portfolio count: 3 workloads.
+- PASS: 1.
+- REVIEW: 2.
+- Capability demand:
+  - block: 2
+  - fast block: 1
+  - file: 1
+  - RWO: 2
+  - RWX: 1
+
+Business impact:
+
+- Gives platform teams a concrete storage capability backlog.
+- Keeps portfolio triage separate from migration wave planning.
+- Enables early sizing of expert review demand.
+
+Credible demo line:
+
+"The first three workloads show two RWO block candidates, one fast-block review case, and one RWX file-storage review case. That is enough to adjust platform readiness before a broader wave."
+
+### Story 5: "Prevent Raw Block Misclassification"
+
+Personas:
+
+- Storage Architect
+- DBA
+- SRE
+- Application Owner
+
+Scenario:
+
+A workload references devices or raw-looking paths. The team might assume raw block is required, or ignore the signal entirely.
+
+What the repo does:
+
+- Detects raw block hints.
+- Distinguishes review hints from hard raw block requirements.
+- Requires `Block` volume mode only when warranted.
+- Produces evidence questions rather than casually forcing a decision.
+
+Generated gap-closure evidence:
+
+- Reason-code coverage includes `RAW_BLOCK_HINT`, `RAW_BLOCK_REVIEW_REQUIRED`, and `RAW_BLOCK_REQUIRED_NO_PROFILE`.
+- Blocker coverage includes `RAW_BLOCK_REQUIRED_NO_PROFILE`.
+
+Business impact:
+
+- Avoids overbuilding raw block support where filesystem mode is enough.
+- Avoids underbuilding platform support for workloads that truly need raw block.
+- Makes the raw-block conversation evidence-based.
+
+Credible demo line:
+
+"The tool does not turn every device reference into a Block PVC. It asks for confirmation unless the evidence is strong enough to make raw block a hard requirement."
+
+### Story 6: "Capacity Fit And Expansion Risk Before Platform Commitment"
+
+Personas:
+
+- Storage Architect
+- Platform Engineering Lead
+- Capacity Planning Stakeholder
+- Application Owner
+
+Scenario:
+
+A workload's access mode matches, but its storage request is larger than some otherwise compatible classes.
+
+What the repo does:
+
+- Computes storage request from candidate mounts and headroom.
+- Checks each storage class `max_size_gib`.
+- Promotes capacity risk when otherwise compatible classes are too small.
+- Prefers expansion support as a soft signal.
+
+Local evidence:
+
+- Current real-world audit requested 3879 GiB.
+- `standard-rwo` was rejected because max size was too small.
+- `fast-rwo` remained a plausible match.
+- Capacity risk was `MEDIUM`.
+
+Business impact:
+
+- Avoids a false "storage class exists" answer when size constraints break the fit.
+- Surfaces when standard storage capacity is not enough.
+- Helps capacity planners separate size risk from access-mode risk.
+
+Credible demo line:
+
+"The workload was not rejected because RWO was missing. It was pushed to REVIEW because the standard class was too small and the larger fast class became the only plausible fit."
+
+### Story 7: "Evidence Questions Shorten Assessment Cycles"
+
+Personas:
+
+- Application Owner
+- SRE
+- Storage Architect
+- Partner Delivery Lead
+
+Scenario:
+
+A REVIEW result can waste time if it just says "needs review." Engineers need the exact missing facts.
+
+What the repo does:
+
+- Produces evidence questions tied to reason codes.
+- Suggests local evidence to collect.
+- Identifies which decision fields the answer could change.
+
+Examples:
+
+- Confirm durable data paths.
+- Explain shared filesystem purpose.
+- Confirm concurrent writer needs.
+- Validate raw block requirement.
+- Collect longer `iostat`.
+- Resolve device mapping with `lsblk`, `findmnt`, and LVM commands.
+- Confirm growth expectations.
+
+Business impact:
+
+- Reduces back-and-forth between app owners and platform specialists.
+- Turns REVIEW into a trackable worklist.
+- Improves assessment throughput without weakening engineering quality.
+
+Credible demo line:
+
+"The output did not just ask for an expert. It asked the app owner exactly why the shared mount exists and whether concurrent writers are required."
+
+### Story 8: "Quality Gates Prevent Unsupported Business Claims"
+
+Personas:
+
+- Governance Lead
+- Platform Engineering Lead
+- Partner Delivery Lead
+- Solutions Engineer
+
+Scenario:
+
+A tool produces a plausible technical result from incomplete evidence. A sales or migration team may be tempted to use it as a business-ready claim.
+
+What the repo does:
+
+- Scores input realism.
+- Scores bundle quality.
+- Validates decisions.
+- Applies configurable quality gates.
+- Blocks business/release use when evidence is weak.
+
+Local evidence:
+
+- Current audit quality gate returned `REVIEW`.
+- Issues:
+  - topology evidence below gate
+  - bundle quality below gate
+  - generic profile blocked for business review
+- Warning:
+  - no trusted label
+
+Business impact:
+
+- Protects credibility.
+- Prevents generated data from becoming false ROI evidence.
+- Gives governance a usable control story.
+
+Credible demo line:
+
+"The engine produced a plausible fit, but the quality gate refused to let that become a business-review claim because the profile was generic and topology evidence was incomplete."
+
+### Story 9: "Redacted Local Evidence Enables Sensitive Estate Triage"
+
+Personas:
+
+- Security / Compliance Lead
+- Application Owner
+- Partner Delivery Lead
+- SRE
+
+Scenario:
+
+Workload owners are willing to share storage evidence but not raw paths, process arguments, or potentially sensitive host details.
+
+What the repo does:
+
+- Supports redaction modes.
+- Preserves path shape under `/redacted/path_NNN/...`.
+- Produces redaction maps.
+- Keeps topology analyzable while limiting exposure.
+
+Local evidence:
+
+- Current audit bundle redaction mode: `redact_first:balanced`.
+- Redaction preservation score: `1.0`.
+- Redacted candidate path preserved hierarchy shape.
+
+Business impact:
+
+- Makes partner or central platform triage possible without broad access to sensitive host details.
+- Reduces friction in pre-sales and early assessment.
+- Maintains enough structure for mount hierarchy analysis.
+
+Credible demo line:
+
+"The partner did not need real host paths or full process arguments. The redacted bundle preserved enough structure to analyze storage shape."
+
+### Story 10: "Outcome-Linked Calibration Instead Of Synthetic Accuracy Theater"
+
+Personas:
+
+- Governance Lead
+- Platform Engineering Lead
+- Internal Audit
+- Product Owner
+
+Scenario:
+
+A tool looks accurate on synthetic examples but has no real-world evidence that its decisions predict successful storage fit.
+
+What the repo does:
+
+- Distinguishes synthetic, expert-consensus, and outcome-linked cases.
+- Excludes synthetic cases from calibration readiness.
+- Requires expert review/adjudication and decisive storage-relevant outcomes.
+- Tracks outcome backlog and calibration actions.
+
+Local evidence:
+
+- Example corpus decision accuracy: `1.0`.
+- Readiness remains research-only because trusted labels and outcome-linked cases are absent.
+- Full-coverage and gap-closure generated cases are explicitly synthetic and not calibration-ready.
+
+Business impact:
+
+- Prevents overclaiming.
+- Creates a credible path to validated core technology.
+- Gives stakeholders a roadmap from regression tests to empirical decision support.
+
+Credible demo line:
+
+"The synthetic corpus passes, but the repo correctly refuses to call itself production-calibrated until expert-reviewed, outcome-linked cases exist."
+
+### Story 11: "Storage Profile Provenance And Decision Diff For Governance"
+
+Personas:
+
+- Storage Architect
+- Governance Lead
+- Platform Engineering Lead
+- SRE
+
+Scenario:
+
+Storage profiles change over time. A workload that passed last month may fail after profile limits, tiers, or snapshot/expansion support change.
+
+What the repo does:
+
+- Creates profile snapshots with checksums and fingerprints.
+- Records engine policy, thresholds, config path/hash, and policy-pack path/hash in fit output.
+- Provides decision diff between old and new fit JSON.
+
+Business impact:
+
+- Makes decision changes explainable.
+- Supports auditability across platform profile changes.
+- Helps platform teams understand whether a decision changed because the workload changed, the profile changed, or the policy changed.
+
+Credible demo line:
+
+"When the storage profile changed, the team could diff decisions and see whether the blocker came from capacity, performance tier, access mode, or volume mode."
+
+### Story 12: "Pre-Sales Discovery Without Becoming A Migration Planner"
+
+Personas:
+
+- Solutions Engineer
+- Partner Delivery Lead
+- Enterprise Architect
+- Platform Engineering Lead
+
+Scenario:
+
+A partner or sales engineer needs to qualify whether stateful workloads are plausible candidates for a Kubernetes-compatible platform before selling a deeper engagement.
+
+What the repo does:
+
+- Runs offline from ordinary Linux outputs and a storage profile.
+- Produces reason-coded fit decisions.
+- Summarizes portfolio capability demand.
+- Provides redacted evidence and caveats.
+- Does not produce pricing, manifests, or migration waves.
+
+Business impact:
+
+- Creates a credible discovery artifact.
+- Filters out obvious storage blockers early.
+- Helps scope the next paid technical assessment.
+
+Credible demo line:
+
+"This is not a migration plan. It is a preflight that tells us which workloads are simple fits, which need architecture review, and which expose platform storage gaps."
+
+### Story 13: "Block Platform Gaps Before They Become Delivery Failures"
+
+Personas:
+
+- Platform Engineering Lead
+- Storage Architect
+- Migration Factory Lead
+- Business Sponsor
+
+Scenario:
+
+The target platform lacks RWX file storage, raw block support, sufficient capacity, or a needed performance tier. These gaps are often discovered too late.
+
+What the repo does:
+
+- Emits blockers:
+  - `NO_STORAGE_CLASS_MATCH`
+  - `CAPACITY_EXCEEDS_AVAILABLE_PROFILE`
+  - `RAW_BLOCK_REQUIRED_NO_PROFILE`
+  - `SHARED_FILESYSTEM_REQUIRED_NO_RWX_PROFILE`
+- Tracks blocker coverage in generated gap-closure labs.
+
+Business impact:
+
+- Stops bad-fit workloads before delivery teams burn time.
+- Gives platform owners concrete capability gaps.
+- Helps business sponsors understand that some workloads require platform investment or redesign before migration.
+
+Credible demo line:
+
+"The issue is not that the app is impossible. The issue is that the supplied platform profile lacks the capability the workload appears to need."
+
+### Story 14: "Business Impact Tracking Without Unsupported Dollar Claims"
+
+Personas:
+
+- Business Sponsor
+- Partner Delivery Lead
+- Governance Lead
+- Finance Stakeholder
+
+Scenario:
+
+Leadership wants ROI, but the tool does not price storage or estimate migration savings.
+
+What the repo does:
+
+- Captures assessment minutes.
+- Captures expert review minutes.
+- Captures blocker-found-before-pilot signals.
+- Captures failed-pilot-avoided flags.
+- Captures platform gap identified flags.
+- Scores impact record quality.
+- Refuses to count unsupported impact as high quality.
+
+Local evidence:
+
+- Current audit business-impact summary returned `EVIDENCE_MISSING`.
+- Gap-closure lab includes 35 generated impact records but marks claim status `SIMULATED_ONLY`.
+
+Business impact:
+
+- Enables real ROI tracking once teams supply measured impact.
+- Avoids fake dollar estimates.
+- Creates an operational evidence model that can become credible over time.
+
+Credible demo line:
+
+"The tool can track avoided rework and assessment time, but it will not turn generated data into a real ROI claim."
+
+## Highest-ROI Demo Narrative
+
+The most compelling demo should be structured as a platform readiness workshop:
+
+1. Show the target storage profile.
+
+   Explain that the platform offers standard RWO block, fast RWO block, shared RWX file, and raw block.
+
+2. Run or display the three example workloads.
+
+   - Database: PASS on standard RWO block.
+   - Shared file workload: REVIEW on shared RWX file.
+   - Latency-risk database: REVIEW on fast RWO block.
+
+3. Show portfolio capability demand.
+
+   - RWO demand: 2.
+   - RWX demand: 1.
+   - Fast block demand: 1.
+   - File storage demand: 1.
+
+4. Show why REVIEW is useful.
+
+   REVIEW means "ask these specific questions," not "we have no idea."
+
+5. Show the generated real-world audit.
+
+   The tool handles incomplete real evidence by producing REVIEW, missing data, and quality gate issues.
+
+6. Show the governance boundary.
+
+   Synthetic data is useful for regression, but not calibration.
+
+7. End with the business message.
+
+   The tool reduces wasted assessment effort and exposes storage capability gaps before the program commits to a pilot or platform scope.
+
+## Defensible Core-Technology Elements
+
+The repo has several defensible technical assets:
+
+1. Evidence graph
+
+   Observations, inferences, warnings, and missing facts are explicitly modeled.
+
+2. Storage behavior fingerprint
+
+   The tool translates VM evidence into structured behavior dimensions such as shared namespace dependency, writer topology, raw block likelihood, latency sensitivity, expansion need, and evidence quality.
+
+3. Formal requirement extraction
+
+   The engine converts behavior into hard requirements, soft preferences, and unresolved dimensions.
+
+4. Constraint solver
+
+   Storage classes are evaluated against explicit constraints, with hard failures, soft warnings, and counterfactuals.
+
+5. Evidence questions
+
+   REVIEW results produce next-step questions that can change the decision.
+
+6. Quality gates
+
+   The workflow distinguishes technical output from business-review or release-ready evidence.
+
+7. Calibration workflow
+
+   The project has a path from synthetic regression cases to expert-consensus and outcome-linked evidence.
+
+8. Local-only privacy posture
+
+   No network calls, no credentials, no cluster access, and redacted bundles make the tool distributable.
+
+9. Portfolio aggregation
+
+   A single-workload engine can roll up into capability demand without becoming a migration wave planner.
+
+10. Data contracts and schemas
+
+   Versioned artifact contracts support repeatability, auditability, and partner handoff.
+
+## Realistic ROI Categories
+
+The strongest ROI is operational and risk-adjusted:
+
+1. Avoided failed pilots
+
+   Catching RWX, raw block, capacity, or latency blockers before a pilot saves platform, app, DBA, and storage team time.
+
+2. Faster qualification
+
+   PASS cases can move forward with less expert escalation. REVIEW cases get targeted questions. FAIL cases expose profile gaps.
+
+3. Better platform scope
+
+   Capability demand helps platform teams avoid underbuilding storage options for the real estate.
+
+4. Reduced expert toil
+
+   Storage architects and DBAs spend time on the small set of high-risk cases rather than every VM.
+
+5. Lower rework risk
+
+   Decisions are reason-coded and tied to storage profile constraints, so misunderstandings are caught earlier.
+
+6. Better partner credibility
+
+   A partner can show evidence, caveats, and next questions instead of hand-wavy modernization claims.
+
+7. Governance confidence
+
+   Quality gates, provenance, and calibration boundaries help prevent unsupported claims from reaching leadership.
+
+8. Safer handling of sensitive estates
+
+   Redacted local bundles reduce friction when collecting early evidence.
+
+## Remaining Limitations And Caveats
+
+These caveats should remain visible in every serious demo:
+
+1. A short `iostat` sample is not a benchmark.
+
+   It can signal risk but cannot prove target-platform performance.
+
+2. Process names are hints.
+
+   They do not prove full application topology or every dependency.
+
+3. Root-only storage visibility lowers confidence.
+
+   Durable data may be hidden under root paths unless owners declare application data paths.
+
+4. Shared filesystem detection does not explain why sharing exists.
+
+   It may be required, incidental, read-only, operational, or architectural.
+
+5. Block-backed filesystem is not raw block.
+
+   The tool correctly separates `Filesystem` and `Block` volume modes.
+
+6. Capacity headroom is heuristic.
+
+   Growth rates and retention behavior require owner evidence.
+
+7. The tool does not connect to a cluster.
+
+   It evaluates a supplied profile, not live cluster behavior.
+
+8. The tool does not prove application correctness.
+
+   Storage fit is one dimension of readiness.
+
+9. Synthetic generated data is not real-world validation.
+
+   The repo correctly excludes synthetic cases from calibration readiness.
+
+10. Business impact requires measured records.
+
+   Generated impact data remains simulated-only or evidence-missing unless real records are supplied.
+
+11. Multi-VM and distributed app relationships are outside the one-VM MVP.
+
+   Shared dependencies, replication, failover, and quorum behavior need separate owner evidence.
+
+12. Identity, permissions, and security contexts are not fully modeled.
+
+   UID/GID, SELinux, fsGroup, and application-level permissions remain unresolved dimensions.
+
+## Recommended Next Product Moves
+
+To turn this into more defensible core technology with real business impact:
+
+1. Build a real-case acquisition program.
+
+   Collect redacted, owner-enriched cases from actual assessments.
+
+2. Require expert review and adjudication.
+
+   Each serious case should have at least two reviewers or an adjudicated label.
+
+3. Link outcomes.
+
+   Track whether the workload onboarded successfully, was blocked by storage, required storage rework, or failed a storage assumption.
+
+4. Improve workload-family policy packs.
+
+   Extend relational database, file server, search/logging, queue/streaming, and generic app packs with field-tested thresholds.
+
+5. Expand evidence questions into owner worksheets.
+
+   Convert questions into a concise app-owner handoff form.
+
+6. Add richer profile quality checks.
+
+   Detect unrealistic max sizes, missing expansion data, missing snapshot policy, and vague performance tiers.
+
+7. Add multi-VM relationship metadata.
+
+   Keep the one-VM engine, but allow portfolio cases to declare shared clusters, replication groups, and failover relationships.
+
+8. Add performance validation handoff.
+
+   Generate a deeper validation plan when latency is high, without running benchmarks automatically.
+
+9. Improve calibration reports.
+
+   Report false PASS rate, false FAIL rate, REVIEW usefulness, expert disagreement rate, and policy-pack readiness by family.
+
+10. Keep the local-only and vendor-neutral boundary.
+
+   This is part of the product's trust model.
+
+## Bottom Line
+
+The top business story is:
+
+> `stateful-storage-fit` helps platform, storage, database, and application teams find out early whether a VM-based stateful workload plausibly fits the target persistent storage options, what capability gaps exist, and what evidence is needed next.
+
+That has real business value because stateful storage mismatch is one of the practical ways modernization programs burn time: a workload looks easy until RWX, raw block, capacity, latency, topology, or ownership details appear too late. This repo turns those risks into deterministic, reviewable, local evidence.
+

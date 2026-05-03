@@ -1,0 +1,765 @@
+# host-screen-contracts Demo Deep Dive
+
+Generated on 2026-05-02 from local analysis of `host-screen-contracts`, local CLI runs, generated input/output artifacts, tests, and web research.
+
+## Executive Thesis
+
+`host-screen-contracts` is most valuable when positioned as a deterministic evidence layer between legacy host-screen transactions and API/wrapper modernization work. It is not a wrapper, emulator, migration platform, or code generator. Its defensible core is narrower and stronger: record a host-screen path, turn it into a reviewable transaction contract, produce an OpenAPI candidate, create replay evidence, detect drift, produce privacy artifacts, and benchmark package readiness before teams invest in wrapper implementation.
+
+That matters commercially because legacy modernization programs often fail or overrun when teams begin implementation before they understand the transaction shape, field semantics, error paths, drift risk, privacy constraints, and replayability. The repo creates a concrete artifact set that lets modernization sponsors, API owners, host SMEs, security teams, QA teams, and partner delivery teams make evidence-based decisions earlier.
+
+The most credible ROI is not "automatic modernization." The credible ROI is reduced discovery time, fewer wrapper rework cycles, earlier privacy approval, drift detection before outages, better modernization backlog prioritization, safer partner handoff, and higher confidence that the first wrapper implementation is aimed at the right transaction contract.
+
+## External Market Context
+
+The web research supports the repo's business premise:
+
+- The U.S. GAO reported in July 2025 that the federal government spends over $100 billion annually on IT, that agencies typically report about 80 percent of IT spending on operations and maintenance, and that legacy systems can create cost and cybersecurity challenges. GAO also found that incomplete modernization plans increase the likelihood of cost overruns, schedule delays, and project failure. Source: https://www.gao.gov/products/gao-25-107795
+- The OpenAPI Specification defines a standard, language-agnostic interface that helps humans and computers understand API capabilities without source code or network traffic inspection. That aligns with this repo's OpenAPI output as a review artifact rather than deployed server code. Source: https://spec.openapis.org/oas/v3.1.1.html
+- IBM's Integrated Web Services for IBM i page frames APIs and web services as a path for externalizing and reusing existing ILE business logic. That supports the business story that teams often want to expose existing host logic without rewriting it first. Source: https://www.ibm.com/support/pages/integrated-web-services-ibm-i-web-services-made-easy
+- IBM's 5250 ENPTUI documentation shows that 5250 full-screen applications can include richer constructs such as push buttons, check boxes, radio buttons, subfile selection lists, windows, menu bars, and pull-down menus. That supports the repo's attention to screen structure, subfiles, fields, function keys, layout, and drift rather than treating traces as simple text. Source: https://www.ibm.com/docs/en/hats/9.7.0?topic=poct-enabling-enhanced-non-programmable-terminal-user-interface-enptui
+- NIST's Privacy Framework describes privacy risk as arising from system, product, and service operations with data across the data lifecycle, with organizational impacts such as noncompliance costs, revenue loss, brand harm, and cultural harm. That supports the repo's privacy-report, sanitize-trace, tokenization, redaction, and local-only design. Source: https://www.nist.gov/privacy-framework/getting-started-0
+- NIST SP 800-53 Rev. 5 provides a security and privacy control catalog intended to manage risk from threats, errors, structural failures, and privacy risks. This supports treating host-screen trace handling as a controlled evidence workflow. Source: https://csrc.nist.gov/Pubs/sp/800/53/r5/upd1/Final
+
+## What I Ran Locally
+
+Commands and outcomes from this review:
+
+- `python3 -m pytest -q`: 70 tests passed.
+- `validate-trace` against `examples/order_lookup.trace.jsonl`: ok, no warnings, no blockers.
+- `validate-trace` against `examples/customer_update.trace.jsonl`: ok, no warnings, no blockers.
+- `extract` for `order_lookup`: high-confidence contract, 2 screens, 1 action, 1 request field, 2 response fields, 3 field-map names, no blockers.
+- `extract` for `customer_update`: high-confidence contract, 2 screens, 1 action, 2 request fields, 1 response field, 3 field-map names, no blockers.
+- `replay` for both example transactions: ok.
+- `validate-openapi` for generated OpenAPI: ok, local errors empty.
+- `privacy-report` for raw `customer_update`: 1 high-severity unredacted sensitive value on `account_number`.
+- `sanitize-trace --tokenize` plus `privacy-report`: 0 unredacted sensitive values after sanitization.
+- `label-sheet` for `order_lookup`: 4 fields, including one output field that still needs review because it was label-inferred rather than accepted from the field map.
+- `compare` original contract to original trace: compatible.
+- `mutate-trace` with a label change and field move, then `compare`: breaking change, with `layout_changed` and `field_moved_or_resized`.
+- `generate-corpus`: 9 generated packages.
+- `coverage-report`: 40 required coverage tags covered, 100 percent coverage.
+- `generate-adversarial-corpus`: 5 negative validation packages.
+- `realism-report`: 9 synthetic packages, 1 blocker package, average business-impact score 64.22, quick-win candidates `customer_update_l4` and `order_inquiry_l4`.
+- `dataset benchmark` for `order_inquiry_l4`: 5 traces, 4 contract-ready, 0.8 contract-ready rate, 1.0 field-map coverage.
+- `dataset benchmark` for `customer_update_l4`: 3 traces, 2 contract-ready, 0.6667 contract-ready rate, 1.0 field-map coverage.
+- `extract-package` for `order_inquiry_l4`: combined contract, combined OpenAPI, combined replay pytest, and drift baseline generated.
+- `extract-package` for `customer_update_l4`: combined contract, combined OpenAPI, combined replay pytest, and drift baseline generated.
+- `bundle` and `bundle-score`: complete handoff bundle scored 100/100.
+
+Artifacts were generated under `/tmp/hsc-host-screen-demo` during this review.
+
+## Generated Input Deep Dive
+
+### Example: Order Lookup
+
+Input files:
+
+- `host-screen-contracts/examples/order_lookup.trace.jsonl`
+- `host-screen-contracts/examples/order_lookup.fields.yml`
+
+The trace is a simple recorded screen path:
+
+- Screen 1: `ORDER LOOKUP`
+- Input field: `f_04_32`, row 4, col 32, length 8
+- Action: `ENTER`, value `10004567`
+- Screen 3: `ORDER DETAIL`
+- Output fields: echoed order number, customer name, order status
+- Function keys: `F3`, `F12`
+
+The field map gives business names and types:
+
+- `order_number` as required input
+- `customer_name` as output
+- `order_status` as output
+- A declared volatile region for row 1, col 65, length 15
+
+Business meaning: this is the simplest credible API candidate. It gives the API owner, host SME, and integration architect a contract-like path without source-code access or a live host connection.
+
+### Example: Customer Update
+
+Input files:
+
+- `host-screen-contracts/examples/customer_update.trace.jsonl`
+- `host-screen-contracts/examples/customer_update.fields.yml`
+
+The trace represents an update workflow:
+
+- Screen 1: `CUSTOMER UPDATE`
+- Protected/display-only customer id
+- Input fields: account number and phone
+- Action: `ENTER`
+- Screen 3: `CUSTOMER RESULT`
+- Output field: `update_status`
+
+The field map marks `account_number` sensitive. The raw privacy report found one high-severity unredacted sensitive value. After `sanitize-trace --tokenize`, the sanitized privacy report showed zero unredacted sensitive values.
+
+Business meaning: the repo can separate structural evidence from sensitive data. That is a major adoption point because security and privacy review often blocks sharing real traces with implementation partners.
+
+### Generated Corpus
+
+The generated corpus contains 9 package directories and covers 40 required tags. The packages are:
+
+- `order_inquiry_l4`: inquiry, not-found, label drift, field movement, volatile region, leading-zero identifier, date field, multi-value.
+- `customer_update_l4`: update, confirmation, sensitive field, hidden field, absent hidden field, multi-screen request, optional input, long truncated value.
+- `account_list_l3`: subfile/list selection with paging and sensitive values.
+- `exception_paths_l3`: validation error, permission denied, cancel function key, unsupported AID, same-screen loop, 27x132 screen, attribute drift.
+- `boundary_locale_l2`: blank optional input, boundary values, currency and decimal formats, invalid date, negative amount, locale formats.
+- `repeated_labels_l2`: repeated labels and field reuse ambiguity.
+- `navigation_l2`: menu navigation without credentials.
+- `inventory_plain_text_l2`: plain-text-only trace.
+- `low_confidence_l0`: intentionally weak trace used as a guardrail.
+
+The corpus is good for deterministic development, demonstrations, and regression coverage. It is not proof of production fit because all generated packages are marked synthetic by provenance.
+
+## Code Deep Dive
+
+### CLI Orchestration
+
+`src/host_screen_contracts/cli.py` exposes the product workflow:
+
+- `validate-trace`
+- `extract`
+- `replay`
+- `validate-openapi`
+- `sanitize-trace`
+- `privacy-report`
+- `label-sheet`
+- `compare`
+- `mutate-trace`
+- `dataset validate`
+- `dataset benchmark`
+- `extract-package`
+- `generate-corpus`
+- `coverage-report`
+- `realism-report`
+- `bundle`
+- `bundle-score`
+- `record-manual`
+
+Business implication: the CLI already maps to real implementation phases: intake, validation, contract extraction, review, privacy, replay, drift comparison, package readiness, and handoff.
+
+### Trace and Contract Model
+
+Relevant modules:
+
+- `trace_schema.py`
+- `parse_trace.py`
+- `validate_trace.py`
+- `contract_model.py`
+- `models.py`
+
+These modules define typed recorded events, screen events, action events, fields, warning/blocker codes, transaction contracts, screen contracts, transitions, and replay summaries.
+
+Business implication: the tool is not a pile of text parsing. It has a concrete interchange model that can become an integration boundary for future adapters, review tools, governance workflows, and partner submissions.
+
+### Extraction Engine
+
+Relevant module:
+
+- `flow_extract.py`
+
+Core behavior observed in code:
+
+- Validates the trace before extraction.
+- Computes screen hashes and field layout hashes.
+- Builds transitions from screen-action-screen sequences.
+- Extracts request fields from action inputs.
+- Extracts response fields from final/output screens.
+- Uses field-map metadata where available.
+- Flags blockers when no input fields or no final output fields are found.
+- Produces deterministic warning/blocker lists.
+- Produces a replay case.
+- Produces a flow graph.
+- Computes confidence from blockers, warnings, plain-text-only state, and field confidence.
+
+Business implication: this is the central core-technology component. Its value is not the pretty report; it is the deterministic conversion of noisy recorded screen behavior into a reviewable transaction model with confidence, hashes, fields, transitions, and replay evidence.
+
+### Field Semantics and Human Labeling
+
+Relevant modules:
+
+- `field_map.py`
+- `field_classification.py`
+- `label_inference.py`
+- `label_sheet.py`
+
+The repo allows field maps to override inferred names and roles. The label-sheet workflow produced 4 fields for `order_lookup`; 3 were accepted from the field map and 1 echoed output field was marked `needs_review`.
+
+Business implication: this is a strong human-in-the-loop design. It does not pretend inferred field names are authoritative. It compresses SME work by showing exactly which fields need review.
+
+### OpenAPI Candidate Generation
+
+Relevant modules:
+
+- `openapi_gen.py`
+- `openapi_validate.py`
+
+The generated OpenAPI includes:
+
+- `openapi: 3.1.0`
+- A POST path such as `/transactions/order-lookup`
+- Request and response schemas
+- `x-screen-flow`
+- `x-contract-confidence`
+- `x-source-screen-hash`
+- `x-screen-flow-graph`
+- `x-screen-field`
+- `x-field-confidence`
+- `x-inference-source`
+
+Business implication: this gives API product owners, architects, and wrapper developers a concrete collaboration artifact. The extensions preserve trace evidence so OpenAPI is not detached from host-screen reality.
+
+### Offline Replay
+
+Relevant modules:
+
+- `replay_model.py`
+- `replay_driver.py`
+- `replay_gen.py`
+
+The replay driver walks recorded traces only. It verifies expected screen hashes, applies recorded AID actions, checks input fields and values, extracts response values, and fails on unexpected transitions.
+
+Business implication: replay is an evidence check, not a live integration test. That honesty is commercially valuable because it avoids overpromising. The immediate ROI is catching contract/trace mismatch before wrapper work begins.
+
+### Drift Detection
+
+Relevant modules:
+
+- `drift_compare.py`
+- `trace_mutation.py`
+- `drift_baseline.py`
+- `screen_hash.py`
+
+The local mutated-trace test produced a breaking-change result:
+
+- `layout_changed` on `screen_003`
+- `field_moved_or_resized` for `f_06_32`
+- Expected col 32, actual col 34
+
+Business implication: this is one of the most defensible stories. Host-screen wrappers often break when labels move, fields resize, or screen flows change. A deterministic drift report gives release managers and wrapper teams a pre-production signal.
+
+### Privacy and Redaction
+
+Relevant modules:
+
+- `privacy_report.py`
+- `sanitize_trace.py`
+- `redact.py`
+- `tokenize.py`
+
+The raw `customer_update` trace had one high-severity unredacted sensitive action input, `account_number`. The sanitized trace had zero unredacted sensitive values while preserving structural metadata.
+
+Business implication: this supports partner delivery and governance. Teams can share sanitized structural evidence without exposing raw sensitive data.
+
+### Dataset, Benchmark, Realism, and Packages
+
+Relevant modules:
+
+- `dataset_model.py`
+- `dataset_validate.py`
+- `benchmark.py`
+- `realism_report.py`
+- `package_extract.py`
+- `real_world_data_generator.py`
+- `bundle_score.py`
+
+The corpus workflow moves the repo from a single-transaction utility to a portfolio evidence engine:
+
+- Package validation checks manifests, traces, field maps, privacy, and extraction.
+- Benchmarking measures contract-ready rate, review-required count, field-map coverage, generated coordinate names, inferred label names, warnings, and blockers.
+- Realism reporting groups quick wins, privacy-review candidates, drift-prone candidates, subfile-heavy candidates, low-confidence candidates, and next actions.
+- Package extraction writes combined contracts, combined OpenAPI, combined replay pytest, and drift baselines.
+- Bundle scoring grades handoff completeness.
+
+Business implication: this is the bridge from developer tool to core modernization technology. It can rank and govern transaction candidates across a modernization backlog.
+
+### Adapter Boundary
+
+Relevant module:
+
+- `adapter_protocol.py`
+
+The README and adapter protocol keep live capture outside the Apache-2.0 core. The core consumes neutral JSONL and does not bundle emulator code, proprietary SDKs, credentials, host login, or network behavior.
+
+Business implication: this lowers procurement, legal, and security friction. It also keeps the core defensible: the repo owns the evidence model and analysis pipeline, while capture adapters can vary by customer environment and licensing boundary.
+
+## Generated Output Deep Dive
+
+### Example Contract Output
+
+`order_lookup` generated:
+
+- `confidence: HIGH`
+- 2 screens
+- 1 transition
+- 1 request field
+- 2 response fields
+- flow graph with 2 nodes and 1 edge
+- screen hashes, normalized text hashes, field layout hashes, cursor hashes
+- replay case `happy_path_order_lookup`
+- no warnings and no blockers
+
+Business meaning: this is a strong wrapper-discussion artifact. It is not only a report; it is a machine-readable transaction model.
+
+### Example OpenAPI Output
+
+`order_lookup` OpenAPI generated:
+
+- `POST /transactions/order-lookup`
+- `OrderLookupRequest` with required `order_number`
+- `OrderLookupResponse` with `customer_name` and `order_status`
+- `409` for screen flow mismatch
+- `422` for validation/error screen state
+- screen-origin extensions for fields and flow
+
+Business meaning: the API owner gets an API review surface, while the host SME can still trace every field back to row, column, field id, and screen hash.
+
+### Replay Output
+
+Replay passed for both `order_lookup` and `customer_update`.
+
+Business meaning: the generated contract and recorded trace agree. This is a prerequisite before involving wrapper developers.
+
+### Privacy Output
+
+Raw `customer_update`:
+
+- finding count: 1
+- unredacted sensitive value count: 1
+- highest unredacted severity: HIGH
+- sensitive field: `account_number`
+
+Sanitized `customer_update`:
+
+- finding count: 1
+- unredacted sensitive value count: 0
+- highest unredacted severity: null
+- redacted: true
+
+Business meaning: this gives privacy officers and partner delivery teams a concrete before/after control.
+
+### Drift Output
+
+Original contract compared to mutated trace:
+
+- status: `breaking_change`
+- change count: 2
+- changes: layout changed, field moved or resized
+
+Business meaning: this is directly tied to wrapper maintenance ROI. It can prevent release-time surprises when a host screen changes.
+
+### Corpus Output
+
+Coverage report:
+
+- 9 packages
+- 40 required tags
+- 40 covered tags
+- 100 percent coverage
+
+Realism report:
+
+- 9 synthetic packages
+- 1 blocker package
+- average business-impact score 64.22
+- quick wins: `customer_update_l4`, `order_inquiry_l4`
+- privacy-review candidates: `account_list_l3`, `customer_update_l4`, `inventory_plain_text_l2`
+- drift-prone candidates: `exception_paths_l3`, `order_inquiry_l4`
+- subfile-heavy candidates: `account_list_l3`
+
+Business meaning: the tool can prioritize work rather than dumping all transactions into the same modernization queue.
+
+## Personas
+
+- Modernization sponsor: owns budget, timeline, and modernization outcomes.
+- Enterprise architect: decides what should become API-first, wrapper-based, rewritten, retired, or left alone.
+- API product owner: owns API shape, consumer contract, versioning, and developer experience.
+- Integration architect: maps host behavior into enterprise integration patterns.
+- Host application SME: understands screens, function keys, field meanings, hidden fields, and exception paths.
+- Wrapper developer: implements the eventual screen-driver integration or API wrapper outside this core.
+- QA automation lead: turns replay cases into regression gates and release evidence.
+- Release manager: decides whether a host-screen change can ship without breaking downstream wrappers.
+- Security/privacy officer: approves whether traces and field maps can be shared.
+- Compliance/audit lead: needs evidence that data handling, review, and modernization controls are documented.
+- Partner delivery lead: needs a safe handoff packet before assigning implementation teams.
+- Partner sales engineer: needs a credible pre-sales artifact without live credentials or raw customer data.
+- Operations lead: cares about outages, brittle wrappers, and incident triage.
+- Business process owner: owns the transaction outcome, such as order lookup or customer update.
+
+## Top Business Stories
+
+### 1. API Contract Before Wrapper Build
+
+Personas: API product owner, host application SME, integration architect, wrapper developer, business process owner.
+
+Story: A business unit wants an API for a stable order inquiry transaction. Today, the transaction is known only as a sequence of host screens and operator steps. The API product owner asks for a contract, the host SME records a trace, and the integration architect runs `host-screen-contracts extract`.
+
+Repo proof:
+
+- `order_lookup` extracted as high confidence.
+- Generated OpenAPI defines `/transactions/order-lookup`.
+- Contract includes screen hashes, row/column field origins, request field, response fields, and replay case.
+- Replay passed offline.
+
+ROI path:
+
+- Reduces SME interview cycles because the artifact shows screens, fields, AID, output values, and field origins.
+- Reduces wrapper rework because implementation starts from a reviewed contract candidate.
+- Lets API design begin before live host automation, credentials, or deployment decisions.
+
+Credible business impact:
+
+- Faster discovery.
+- Fewer false starts.
+- Earlier API governance review.
+- Cleaner handoff from host SME to API/wrapper team.
+
+### 2. Screen Drift Detection Before Wrapper Outage
+
+Personas: release manager, wrapper developer, QA automation lead, operations lead, host application SME.
+
+Story: A host maintenance release changes an output field position. Without drift detection, the wrapper may parse the wrong field or fail at runtime. With this repo, QA compares the approved contract to a fresh trace before release.
+
+Repo proof:
+
+- I mutated `order_lookup` to move `f_06_32` from col 32 to col 34.
+- `compare` reported `breaking_change`.
+- Changes included `layout_changed` and `field_moved_or_resized`.
+
+ROI path:
+
+- Prevents production incidents caused by subtle screen layout changes.
+- Gives release teams a concrete gate: compatible, review-required, or breaking.
+- Gives developers exact field-level evidence instead of a vague failure report.
+
+Credible business impact:
+
+- Lower outage probability for wrapper-dependent integrations.
+- Faster root cause analysis when host UI changes.
+- Stronger release governance for host-screen APIs.
+
+### 3. Privacy-Safe Partner Handoff
+
+Personas: security/privacy officer, partner delivery lead, legal/compliance lead, host SME, wrapper developer.
+
+Story: A customer wants a partner to help build a wrapper, but raw traces include sensitive values. The privacy officer will not approve sharing unsanitized traces. The team runs privacy reporting and tokenized sanitization, then shares only the sanitized trace, contract, OpenAPI, replay case, and privacy report.
+
+Repo proof:
+
+- Raw `customer_update` privacy report found 1 high-severity unredacted sensitive value on `account_number`.
+- Sanitized/tokenized trace produced 0 unredacted sensitive values.
+- Bundle score was 100/100 with contract, OpenAPI, replay case, replay test, summary, privacy report, and manifest.
+
+ROI path:
+
+- Reduces approval friction for partner delivery.
+- Avoids leaking raw account/customer data in modernization artifacts.
+- Allows implementation teams to work with structure and tokens while sensitive values stay local.
+
+Credible business impact:
+
+- Shorter security review.
+- Lower data-sharing risk.
+- Cleaner audit trail for trace handling.
+
+### 4. Multi-Case API Semantics Instead of Happy-Path Guesswork
+
+Personas: API product owner, host SME, QA automation lead, integration architect, business process owner.
+
+Story: A transaction must expose not just the success path but also not-found behavior, validation errors, drift variants, and replayable examples. Instead of building an API from one happy-path recording, the team packages multiple cases and extracts a combined contract.
+
+Repo proof:
+
+- `order_inquiry_l4` has 5 traces: happy path, alternate value, not found, label drift, and field move drift.
+- Benchmark: 5 traces, 4 contract-ready, 0.8 contract-ready rate, 1.0 field-map coverage.
+- Package extraction generated combined contract, OpenAPI, replay pytest, and drift baseline.
+- OpenAPI can include `422` error schemas for recorded error states.
+
+ROI path:
+
+- Reduces API redesign when the first exception path appears.
+- Gives QA recorded cases to use as regression evidence.
+- Gives API governance a better view of business behavior.
+
+Credible business impact:
+
+- Lower defect rate in first wrapper/API release.
+- Faster API consumer onboarding because error behavior is explicit.
+- Better confidence that the API reflects real recorded behavior.
+
+### 5. Update Workflow With Hidden/Sensitive Field Review
+
+Personas: host SME, integration architect, security/privacy officer, QA automation lead, wrapper developer.
+
+Story: A customer update transaction includes sensitive values, confirmation behavior, hidden-field capture differences, optional inputs, and cancel paths. A naive wrapper could expose the wrong field, miss a confirmation screen, or mishandle hidden/session fields.
+
+Repo proof:
+
+- `customer_update_l4` has tags for update, confirmation, sensitive, hidden field, absent hidden field, hidden-field absence pair, multiple request screens, optional input, and long truncated value.
+- Benchmark: 3 traces, 2 contract-ready, 0.6667 contract-ready rate, 1.0 field-map coverage.
+- Cancel case is correctly not treated as a normal API candidate because it has `NO_FINAL_OUTPUT_FIELDS`.
+
+ROI path:
+
+- Prevents wrapper teams from assuming every recorded path is a business operation.
+- Surfaces hidden-field risk before implementation.
+- Forces security review where sensitive fields exist.
+
+Credible business impact:
+
+- Lower chance of exposing sensitive host fields.
+- Fewer implementation surprises on multi-screen update flows.
+- Better separation between successful transaction contracts and navigation/cancel behavior.
+
+### 6. Portfolio Triage for Modernization Backlog
+
+Personas: enterprise architect, modernization sponsor, partner sales engineer, partner delivery lead, business process owner.
+
+Story: A modernization program has dozens or hundreds of host transactions. The team needs to know which ones are quick wins, which require privacy review, which are drift-prone, and which should not become APIs yet.
+
+Repo proof:
+
+- Realism report produced portfolio buckets:
+  - quick wins: `customer_update_l4`, `order_inquiry_l4`
+  - review-required: all 9 generated packages
+  - privacy-review: `account_list_l3`, `customer_update_l4`, `inventory_plain_text_l2`
+  - drift-prone: `exception_paths_l3`, `order_inquiry_l4`
+  - subfile-heavy: `account_list_l3`
+  - low-confidence: `low_confidence_l0`
+- Recommended next actions include reviewing quick-win contracts, sanitizing privacy candidates, reviewing subfile semantics, completing field maps, using drift cases, and replacing low-confidence synthetic cases with sanitized local traces.
+
+ROI path:
+
+- Directs scarce SME and wrapper developer time toward high-readiness transactions.
+- Avoids spending implementation budget on low-confidence or structurally risky candidates first.
+- Gives sales and delivery teams a data-backed modernization roadmap.
+
+Credible business impact:
+
+- Better project sequencing.
+- Lower backlog waste.
+- Faster first wins.
+
+### 7. Subfile/List Screen Guardrail
+
+Personas: API designer, integration architect, host SME, wrapper developer, QA lead.
+
+Story: A host screen displays a list or subfile with paging. A naive modernization team might expose it as a simple list API. But subfiles often encode selection options, paging state, row semantics, and hidden data that need review.
+
+Repo proof:
+
+- `account_list_l3` covers subfile, selection, paging, and sensitive tags.
+- Realism report flags it as subfile-heavy.
+- Benchmark shows 0.0 contract-ready rate and 2 review-required cases.
+- Contracts include subfile review metadata instead of blindly generating a list endpoint.
+
+ROI path:
+
+- Prevents incorrect API semantics.
+- Forces SME review before pagination or selection behavior is turned into an API.
+- Reduces risk of wrappers that only work on one page or one list state.
+
+Credible business impact:
+
+- Fewer production defects on list workflows.
+- Better API design for search, selection, and pagination behavior.
+- Lower rework on complex screens.
+
+### 8. Human Labeling as SME Force Multiplier
+
+Personas: host SME, API product owner, QA lead, integration architect.
+
+Story: Field names inferred from labels are useful but not authoritative. Instead of asking an SME to document an entire transaction manually, the repo generates a label sheet showing proposed field names, confidence, role, type, and review status.
+
+Repo proof:
+
+- `label-sheet` for `order_lookup` produced 4 fields.
+- 3 fields were accepted from the field map.
+- 1 echoed order number was label-inferred and marked `needs_review`.
+
+ROI path:
+
+- Focuses SME time on exceptions and ambiguous fields.
+- Reduces documentation effort.
+- Improves API contract quality without pretending inference is perfect.
+
+Credible business impact:
+
+- Faster field-label review.
+- Fewer wrong field names in APIs.
+- Better audit trail for human acceptance.
+
+### 9. Sales Engineering Artifact Without Credentials
+
+Personas: partner sales engineer, customer IT director, security/privacy officer, modernization sponsor.
+
+Story: In pre-sales, the partner needs to show business value without asking for host credentials, emulator access, or raw customer data. The customer can provide a sanitized recorded trace or use synthetic examples for a workshop. The partner produces a contract, OpenAPI, replay case, privacy report, drift baseline, and bundle score.
+
+Repo proof:
+
+- The repo is local-only and offline.
+- Generated corpus is synthetic and provenance-marked as non-customer, no live capture, no network access.
+- `bundle` produced a complete review packet with a 100/100 completeness score.
+
+ROI path:
+
+- Reduces pre-sales friction.
+- Enables a credible workshop before procurement or privileged access.
+- Shows a concrete path from screen recording to API contract candidate.
+
+Credible business impact:
+
+- Shorter sales cycle for modernization assessments.
+- Better trust with security-conscious customers.
+- More qualified implementation opportunities.
+
+### 10. Modernization Plan Evidence for Governance
+
+Personas: modernization sponsor, enterprise architect, compliance/audit lead, security officer.
+
+Story: A modernization program needs more than a mandate; it needs evidence of work to be done, risks, milestones, and disposition decisions. The repo does not create a full modernization plan, but it supplies transaction-level evidence that can feed one.
+
+Repo proof:
+
+- Contracts describe fields, screens, transitions, warnings, blockers, confidence, and replay cases.
+- Benchmarks show readiness and review requirements.
+- Realism reports identify candidate buckets and next data needed.
+- Drift baselines document current approved screen structure.
+
+ROI path:
+
+- Converts vague modernization inventory into transaction-level evidence.
+- Helps identify which systems are candidates for wrapper/API exposure and which require deeper work.
+- Supports governance conversations with measurable artifacts.
+
+Credible business impact:
+
+- Better modernization planning quality.
+- Reduced risk of underestimating work.
+- Stronger auditability of why a transaction was selected, deferred, or sent to review.
+
+### 11. Boundary and Locale Risk Before Consumer APIs
+
+Personas: QA automation lead, API product owner, business process owner, integration architect.
+
+Story: Real business transactions often fail at boundaries: blank optional fields, max-length values, invalid dates, negative amounts, decimals, currency strings, and locale-specific formats. These cases can break API consumers if they are discovered after wrapper implementation.
+
+Repo proof:
+
+- `boundary_locale_l2` covers blank optional input, max length, invalid date, negative amount, decimal amount, currency format, leading-zero identifiers, locale formats, and validation error.
+- Contract-ready rate is 0.8 with one review-required case.
+
+ROI path:
+
+- Forces early validation of field formats and error paths.
+- Improves API schema discussions before consumers integrate.
+- Gives QA recorded cases for regression checks.
+
+Credible business impact:
+
+- Fewer API consumer defects.
+- Better schema quality.
+- Faster acceptance testing.
+
+### 12. Negative Validation Corpus for Product Hardening
+
+Personas: product engineering lead, QA lead, partner delivery lead, enterprise architect.
+
+Story: A core technology needs to handle bad input, not just polished demos. The adversarial corpus creates malformed packages that test whether the product fails clearly and safely.
+
+Repo proof:
+
+- `generate-adversarial-corpus` created 5 packages for malformed manifest, invalid JSONL, duplicate sequence, out-of-bounds field, and bad field map.
+- Tests pass across validation and extraction workflows.
+
+ROI path:
+
+- Reduces support burden by making failure modes predictable.
+- Builds confidence that partner-submitted packages can be validated before delivery work starts.
+- Prevents bad trace packages from becoming bad contracts.
+
+Credible business impact:
+
+- Lower onboarding risk.
+- Better product quality.
+- More scalable partner ecosystem.
+
+## Why These Stories Are Defensible Core Technology
+
+The repo's defensibility is not based on a proprietary algorithm or AI claim. It comes from the compound value of several hard-to-get details:
+
+- Stable interchange model for recorded host-screen traces.
+- Explicit contracts with field origins, screen hashes, field-layout hashes, transitions, warnings, blockers, and confidence.
+- Offline replay that proves contract/trace consistency without live host access.
+- Drift comparison that can classify compatible, review-required, and breaking changes.
+- Field-map and label-sheet workflow that keeps humans in control of business semantics.
+- Privacy and tokenization workflow that makes partner handoff practical.
+- OpenAPI generation with trace-preserving extensions.
+- Corpus generation, coverage reporting, realism reporting, package benchmarking, and adversarial validation.
+- Adapter boundary that keeps the core independent from emulator licensing, credentials, proprietary SDKs, and live host risk.
+
+This combination is harder to replace than a report generator because it creates a governance-grade evidence pipeline. A report is a presentation. This repo produces typed artifacts that can be tested, replayed, compared, packaged, scored, and used as implementation inputs.
+
+## ROI Measurement Model
+
+Avoid unsupported hard-dollar claims. Measure ROI through operational deltas:
+
+- Discovery hours avoided: compare host SME/interview hours before and after trace-to-contract extraction.
+- Wrapper rework avoided: count field/flow changes found by review before implementation.
+- Drift incidents avoided: count breaking screen changes caught before release.
+- Privacy review cycle time: compare time to approve raw trace sharing versus sanitized structural artifacts.
+- API design cycle time: compare days from candidate transaction to reviewed OpenAPI.
+- QA coverage improvement: count replayable cases per transaction and error paths captured.
+- Backlog prioritization accuracy: compare quick-win candidate predictions to successful implementation outcomes.
+- Partner handoff readiness: bundle completeness score and missing artifact count.
+- Field semantic quality: field-map coverage, generated coordinate names, inferred label names, and SME acceptance rate.
+- Evidence maturity: movement from L0/L1 synthetic to L2+ sanitized local packages and eventually L4/L5 multi-case/drift packages.
+
+## Limitations and Honest Boundaries
+
+- All generated corpus packages in this review are synthetic, even when shaped like L2, L3, or L4 maturity levels.
+- The tool does not connect to a live host.
+- The tool does not emulate terminals.
+- The tool does not generate a production wrapper.
+- The tool does not prove source-level business logic.
+- Replay validates recorded traces only.
+- OpenAPI output is a candidate, not deployed API behavior.
+- Field inference is not authoritative without field-map or SME review.
+- Subfile/list behavior is review metadata, not a generated list API.
+- Privacy reporting helps detect sensitive values but does not replace customer policy, legal approval, retention policy, or data owner approval.
+- Business-impact score is heuristic and should be calibrated against real implementation outcomes.
+
+## Recommended Demo Narrative
+
+For a compelling customer or investor demo:
+
+1. Start with the GAO-style business pain: legacy systems remain expensive, risky, and hard to modernize without complete plans.
+2. Show `order_lookup.trace.jsonl` and explain that the input is just a neutral recorded screen trace.
+3. Run extraction and show high-confidence contract plus OpenAPI.
+4. Run replay to prove the contract matches the recorded path.
+5. Run privacy report on `customer_update` to show a high-severity sensitive field, then sanitize and show zero unredacted sensitive values.
+6. Run drift comparison on a mutated trace to show a breaking field move before a wrapper outage.
+7. Show generated corpus coverage at 100 percent and realism report quick-win buckets.
+8. Show `order_inquiry_l4` package benchmark and combined package extraction.
+9. Show bundle score at 100/100 as the handoff artifact.
+10. Close with the positioning: this is not automatic modernization; it is the evidence layer that makes modernization less blind.
+
+## Highest-Impact Product Direction
+
+To turn this from a strong repo into a core business platform:
+
+- Build a governed trace package intake format for customers and partners.
+- Add a first-class review UI later, but keep the core CLI and schema stable.
+- Add signed artifact bundles and provenance fingerprints.
+- Add a plugin marketplace for capture adapters, kept outside core.
+- Add enterprise policy profiles for privacy, drift tolerance, and package readiness.
+- Add trend analytics across multiple captures and releases.
+- Add integration with API governance tools through OpenAPI and bundle exports.
+- Build a measured ROI dashboard using the operational metrics above.
+- Collect sanitized L2+ and L4/L5 evidence packages from approved non-production and production-like environments.
+
+## Bottom Line
+
+`host-screen-contracts` has credible real business value because it solves the pre-wrapper evidence gap. It gives teams a deterministic way to move from "we have a valuable host transaction on screens" to "we have a reviewable, replayable, privacy-aware, drift-aware API contract candidate." That is a high-ROI wedge because it reduces uncertainty before expensive modernization work starts.
+

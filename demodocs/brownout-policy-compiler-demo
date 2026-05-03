@@ -1,0 +1,324 @@
+# brownout-policy-compiler demo: business stories, personas, ROI, and evidence
+
+Generated from local repo review plus web research on 2026-05-01.
+
+Local subdirectory reviewed: `brownout-policy-compiler`
+
+## Executive thesis
+
+`brownout-policy-compiler` is strongest when positioned as a business-aware incident decision compiler for DDoS and severe overload response. It is not a DDoS detector, scrubbing service, firewall controller, orchestration layer, or report generator. Its core value is that it converts a normalized event plus a business-owned service-priority map into a deterministic, review-only decision package: protect-now actions, degradation candidates, approval queue, blockers, rollback clock, confidence, risk, evidence, and operator questions.
+
+That is a credible core-technology story because the highest-value work during a major availability incident is often not "choose a vendor control." It is deciding, fast and defensibly, which services must stay reachable, which services can degrade, who can approve that degradation, what rollback is required, and what evidence proves the temporary state ended.
+
+## External market and reliability context
+
+The web research supports the repo's problem framing:
+
+- Cloudflare Radar's Q4 2025 DDoS report says DDoS attacks surged 121% in 2025, reaching 47.1 million total attacks and an average of 5,376 mitigated attacks per hour. It also reports hyper-volumetric attacks up to 31.4 Tbps, with one campaign reaching 205 million requests per second. Source: https://radar.cloudflare.com/reports/ddos-2025-q4
+- CISA's DDoS guidance separates volumetric, protocol, and application-layer DDoS, which maps directly to the repo's generated scenarios and attack-class model. Source: https://www.cisa.gov/resources-tools/resources/understanding-and-responding-distributed-denial-service-attacks
+- CISA's denial-of-service overview states that DoS/DDoS can make legitimate users unable to access systems and can cost organizations time and money while services are inaccessible. Source: https://www.cisa.gov/news-events/news/understanding-denial-service-attacks
+- CISA's Capacity Enhancement Guide announcement emphasizes prioritizing DDoS mitigations based on mission and reputational impact, which is essentially what this repo's service-priority contract is doing. Source: https://www.cisa.gov/news-events/alerts/2023/09/06/cisa-releases-capacity-enhancement-guide-strengthen-agency-resilience-ddos-attack
+- NIST SP 800-61r3, finalized in April 2025, frames incident response as part of cybersecurity risk management and says the goal is to reduce incident impact and improve detection, response, and recovery effectiveness. Source: https://www.nist.gov/news-events/news/2025/04/nist-revises-sp-800-61-incident-response-recommendations-and-considerations
+- Google SRE guidance supports graceful degradation, load shedding, criticality-aware rejection, and protecting services from overload and cascading failure. Source: https://sre.google/sre-book/handling-overload/ and https://sre.google/sre-book/addressing-cascading-failures/
+- Uptime Institute's 2024 outage analysis reports that 54% of respondents' most recent significant, serious, or severe outage cost more than $100,000, and 16% cost more than $1 million. It also identifies network-related issues as the largest single cause of IT service outages. Source: https://intelligence.uptimeinstitute.com/index.php/resource/annual-outage-analysis-2024
+
+The realistic ROI claim is therefore not "this stops attacks." It is "this reduces incident decision latency, avoids self-inflicted outage expansion, preserves critical workflows, and improves rollback/audit discipline in incidents where outage cost can be material."
+
+## What the local repo actually contains
+
+The README states the tool is local-only and review-only. It turns a normalized DDoS mitigation event and service-priority map into a temporary brownout package with TTL and rollback. It explicitly does not detect DDoS attacks, scrub traffic, push firewall rules, change routers, call APIs, generate traffic, scan networks, or prove protection.
+
+Key local artifacts reviewed:
+
+- `README.md`: project scope, local-only policy, review-only policy, input/output interpretation, reason codes, safety model.
+- `src/brownout_policy_compiler/models.py`: typed domain model for events, service groups, priorities, brownout modes, action types, risk, approval metadata, rollback controls, endpoint exposure, enforcement points, traffic baselines, and output plans.
+- `src/brownout_policy_compiler/normalize.py`: deterministic target-to-service matching by IP/CIDR, protocol, and port overlap, with confidence reduction for CIDR or missing ports.
+- `src/brownout_policy_compiler/compile_rules.py`: the core compiler. It selects action candidates based on priority, brownout mode, allowed actions, policy pack preferences, event class, trusted-source availability, TTL, risk, confidence, and safety constraints.
+- `src/brownout_policy_compiler/decision_package.py`: the first-read decision layer. It separates protect-now actions, degradation candidates, approval queue, blockers, rollback clock, operator questions, and evidence quality so the output reads like an incident decision package rather than a flat report.
+- `src/brownout_policy_compiler/impact.py`: action-specific business-impact language. It ties each action to the service's business process, owner, user population, impact statement, SLO, dependencies, and degradation type.
+- `src/brownout_policy_compiler/risk.py`: risk scoring. Null-route is critical, destination-port block and deny-untrusted are high, rate-limit/challenge/deprioritize are medium, preserve/prioritize/monitor/no-action are low, with escalations for admin/VPN contexts.
+- `src/brownout_policy_compiler/rollback.py`: rollback plan construction with action-specific verification steps and evidence requirements.
+- `src/brownout_policy_compiler/workflows.py`: readiness, tabletop, post-incident diff, and input-seeding workflows.
+- `src/brownout_policy_compiler/data_generator.py`: deterministic synthetic real-world data generator and audit bundle builder.
+
+## Generated input deep dive
+
+The strongest generated input is under `brownout-policy-compiler/out/real_world_audit_bundle/inputs`.
+
+Coverage from `coverage_report.json`:
+
+- 17 service groups.
+- 26 service endpoints.
+- 18 generated incident scenarios.
+- 22 event targets.
+- 5 trusted source groups.
+- 8 multi-endpoint services.
+- Priority coverage: P0: 5, P1: 2, P2: 2, P3: 2, P4: 6.
+- Brownout modes: PROTECT: 6, RATE_LIMIT: 3, RESTRICT_TO_TRUSTED: 1, SHED: 6, NO_ACTION: 1.
+- Attack classes: APPLICATION: 5, MIXED: 3, PROTOCOL: 2, UNKNOWN: 3, VOLUMETRIC: 5.
+- Mitigation states: ACTIVE: 13, DETECTED: 1, ENDED: 1, ESCALATED: 2, STABLE: 1.
+- The generated data includes IPv6, CIDR endpoints, port ranges, source prefixes, missing ports, low confidence, source-spoofing caution, shared endpoint groups, negative fixtures, redacted bundles, schemas, fingerprints, and a 100-service large-estate fixture.
+
+Important services from `service_priority.yml`:
+
+- `sip_voice`: P0, PROTECT, real-time communications, owned by communications operations, allowed actions include trusted-source preservation, rate-limit-untrusted, and prioritize.
+- `vpn_access`: P0, PROTECT, remote incident administration, owned by network operations, explicitly important because losing VPN slows restoration and change review.
+- `monitoring`: P0, PROTECT, incident visibility, owned by monitoring operations, because monitoring proves deny spikes and rollback success.
+- `auth_gateway`: P0, PROTECT, workforce and customer authentication, 25,000 peak-hour login attempts, direct transaction and workforce-access impact.
+- `payment_endpoint`: P1, PROTECT, payment authorization, 8,000 peak-hour payment attempts, direct transaction impact.
+- `admin_access`: P1, RESTRICT_TO_TRUSTED, incident administration, 40 administrative operators, high operational-control impact.
+- `customer_api`: P2, RATE_LIMIT, 40,000 peak-hour API requests, dependency on authentication.
+- `support_portal`: P3, RATE_LIMIT, 2,500 active case users, support backlog risk.
+- `report_export`: P3, SHED, 600 report users, explicitly deferrable back-office work.
+- `public_marketing_site`: P4, SHED, 50,000 public page views per peak hour, lower direct operational impact.
+- `media_downloads`: P4, SHED, 10,000 peak-hour download requests, capacity-heavy and safe to defer with review.
+- `shared_static_site` and `shared_status_page`: both share an endpoint group, creating collateral-risk coverage.
+- `ipv6_public_status`: P4, SHED, dual-stack status coverage.
+- `emergency_status_notifications`: P0, PROTECT, public status communications, stakeholder visibility impact.
+- `research_sandbox`: P4, NO_ACTION, non-production experimentation, deliberately avoids unnecessary action.
+
+This input is credible because it does not use generic "critical app" placeholders. It models service owners, approvers, rollback owners, customer populations, SLOs, affected users, revenue/operational impact, trusted source groups, endpoint exposure, enforcement points, dependencies, maintenance windows, approval metadata, rollback controls, and traffic baselines.
+
+## Code deep dive
+
+The core defensibility comes from hard boundaries and deterministic rule execution.
+
+1. Service priority is a contract.
+   The service-priority model requires priorities, brownout modes, endpoints, and allowed actions. This means the compiler does not freely invent mitigations. It only emits actions permitted by the service contract.
+
+2. Matching is explicit.
+   `normalize.py` matches event targets to service endpoints by IP or CIDR, protocol, and ports. CIDR matches reduce confidence. Missing ports create warnings. Multiple service matches are flagged. Unmapped targets create monitor-only review items rather than guessed actions.
+
+3. P0/P1 services are protected by design.
+   In `compile_rules.py`, P0 services can receive trusted-source preservation, prioritization, application challenge, and untrusted-source rate limiting. P0/P1 services do not get low-priority shedding. Null-route attempts against high-priority services become blockers.
+
+4. Lower-priority services carry the brownout burden.
+   P3/P4 services can receive challenge, shed, rate-limit, deprioritize, temporary port block, and in narrow cases temporary null-route review. This creates the business motion: preserve critical workflows by degrading deferrable ones first.
+
+5. Null-route safety is explicit.
+   `enforce_null_route_safety` blocks null-route for P0/P1, respects TTL limits, and blocks null-route when multiple services share the same destination. This is one of the most important safety differentiators because null-route is a high-blast-radius action.
+
+6. Risk and approval are not hidden.
+   `risk.py` makes null-route critical, destination-port block and deny-untrusted high, rate-limit/challenge/deprioritize medium, and preserve/prioritize/monitor/no-action low. Admin and VPN contexts elevate risk. Approval-required actions are surfaced.
+
+7. Business impact is generated from structured service metadata.
+   `business_impact_for` creates action-specific text using business process, owner, affected population, impact scale, SLO, revenue/operational impact, customer tiers, and dependencies.
+
+8. Every temporary action has rollback.
+   `rollback.py` builds rollback entries in reverse action order, with rollback owner, deadline, expected baseline state, verification steps, and evidence requirements.
+
+9. The workflows are operational, not cosmetic.
+   `workflows.py` supports readiness scoring, tabletop outputs, scenario cataloging, input seeding, post-incident diffing, and service generation from endpoint inventory.
+
+10. The repo stays review-only.
+    This limits liability and makes it suitable as a decision compiler that can later feed change-control, SOAR, network automation, or human-runbook workflows without pretending to be an enforcement system.
+
+## Generated output deep dive
+
+From `out/real_world_audit_bundle/coverage_report.json`:
+
+- 63 compiled actions across all scenarios.
+- Action counts: ALLOW_TRUSTED_SOURCES: 10, CHALLENGE: 4, DENY_UNTRUSTED: 1, DEPRIORITIZE: 3, MONITOR_ONLY: 2, NO_ACTION: 1, PRIORITIZE: 9, RATE_LIMIT: 12, RATE_LIMIT_UNTRUSTED: 9, SHED_LOW_PRIORITY: 8, TEMPORARY_BLOCK_PORT: 3, TEMPORARY_NULL_ROUTE: 1.
+- Risk levels: LOW: 18, MEDIUM: 32, HIGH: 12, CRITICAL: 1.
+- Approval-required actions: 4.
+- Lint statuses: PASS: 9, REVIEW: 8, FAIL: 1.
+- Warnings include low confidence, missing ports, advisory source prefixes, spoofing-likely source block skip, multiple service matches, and unmapped target.
+- Blocker coverage includes `NULL_ROUTE_COLLATERAL_RISK`.
+- Realism report: 100.0 score, status `REALISM_GAPS_CLOSED`, no remaining structural gaps.
+
+This matters for a demo because the output is not just "a plan." It contains a first-read decision brief, operator queue, approval queue, rollback clock, blocked-action list, evidence, risk factors, confidence rationale, action groups, source-evidence review, executive summary, approval bundle, handoff bundle, rollback plan, redacted bundles, strict-mode reports, schemas, and post-incident diff output.
+
+## Personas
+
+| Persona | Role in the story | What they need from the compiler |
+|---|---|---|
+| Incident commander | Owns incident decisions and escalation | Fast candidate actions, risk, approvals, blockers, operator questions |
+| Network operations lead | Owns edge, routing, VPN, firewall, traffic controls | TTLs, enforcement context, trusted-source groups, rollback steps |
+| Security operations / DDoS lead | Interprets event evidence and attack class | Confidence, source-prefix caution, spoofing handling, attack classification |
+| Service owner | Owns business impact and service acceptability | Clear allowed actions, SLO language, impact, affected users |
+| Application operations lead | Owns API and app behavior under pressure | Challenge/rate-limit/deprioritize candidates, dependency notes |
+| Communications operations lead | Owns voice and public status workflows | Protection of SIP/status/notification services, rollback evidence |
+| Support operations lead | Owns support portal and backlog effects | Tradeoffs between degraded support and preserving core workflows |
+| GRC/change manager | Owns evidence and auditability | Approval bundle, rollback plan, post-incident diff, fingerprints |
+| Executive sponsor | Owns business-risk reduction | Credible ROI narrative, reduced blast radius, reduced MTTR, readiness score |
+| Customer-facing business owner | Owns revenue, trust, and customer impact | Prioritized continuity for auth, payment, status, and customer API |
+
+## Top business stories
+
+### Story 1: Keep the incident response team connected while public traffic is under attack
+
+Personas: incident commander, network operations lead, security operations lead, executive sponsor.
+
+Scenario evidence: `01_volumetric_public_and_vpn` hits `vpn_access` and `public_marketing_site`. The output emits `ALLOW_TRUSTED_SOURCES`, `RATE_LIMIT_UNTRUSTED`, and `PRIORITIZE` for VPN while also allowing rate-limit and shed actions for the public marketing site.
+
+Business story: A volumetric attack hits a remote-access edge at the same time public web traffic is being flooded. The incident commander needs network operators online. The network operations lead needs a bounded way to preserve trusted operator access without broadly opening the service. The compiler prioritizes VPN as P0 and pushes brownout pressure to P4 public marketing traffic.
+
+ROI mechanism: Preserving operator access can shorten restoration time. If a serious outage can cost six or seven figures, even reducing bridge paralysis and restoration delay by tens of minutes has credible ROI. This is especially compelling because the repo models VPN as "remote incident administration" with 120 remote operators and explicitly states loss of VPN slows restoration and change review.
+
+Why credible: The compiler does not invent the action. It uses a P0 service, trusted source group, allowed actions, TTL, risk escalation for VPN, and rollback evidence.
+
+### Story 2: Preserve authentication during a multi-service application-layer event
+
+Personas: incident commander, identity service owner, application operations lead, support operations lead, customer-facing business owner.
+
+Scenario evidence: `10_mixed_multi_target_business_services` spans `auth_gateway`, `support_portal`, `public_marketing_site`, and `report_export`. The output produces 12 actions, including P0 protection for auth and P3/P4 degradation candidates for support, public web, and report export.
+
+Business story: During a mixed attack, authentication is the upstream dependency for workforce and customer access. The support portal and report export matter, but they can degrade before authentication fails. The compiler gives the incident commander a deterministic way to protect login while asking the support and application owners to accept temporary degradation on less critical workflows.
+
+ROI mechanism: Authentication failure blocks customers, staff, and downstream transaction workflows. Preserving auth avoids a broad business outage. Degrading report export and public marketing traffic is a lower-cost sacrifice than losing login entirely.
+
+Why credible: The input declares `auth_gateway` as P0, with 25,000 peak-hour login attempts and direct transaction/workforce impact. It declares report export as deferrable back-office work and public marketing as lower direct operational impact.
+
+### Story 3: Keep payment authorization flowing under application-layer pressure
+
+Personas: payment service owner, incident commander, security operations lead, application operations lead, GRC/change manager.
+
+Scenario evidence: `02_application_payment_endpoint` and `15_stable_payment_region_b` target the payment endpoint. Outputs include `CHALLENGE`, `RATE_LIMIT`, `RATE_LIMIT_UNTRUSTED`, `ALLOW_TRUSTED_SOURCES`, and `PRIORITIZE`.
+
+Business story: A payment API receives abnormal application-layer load. The payment owner does not want blanket denial because failed authorizations can defer or lose transactions. The security lead wants challenge/rate-limit options. The GRC/change manager needs evidence and rollback. The compiler produces a bounded candidate set that keeps partner-approved transactions flowing while reviewing application-edge pressure controls.
+
+ROI mechanism: Payment preservation is one of the clearest revenue-protection stories. The repo models 8,000 peak-hour payment attempts and direct transaction impact. A few minutes of avoided payment failure can create material benefit depending on transaction volume and average transaction value.
+
+Why credible: The tool does not claim business criticality from backup size or traffic alone. The payment service is explicitly marked P1 with trusted payment source groups, approvers, rollback owners, and business-impact text.
+
+### Story 4: Protect voice and emergency status communications during response
+
+Personas: communications operations lead, incident commander, network operations lead, support operations lead, executive sponsor.
+
+Scenario evidence: `04_protocol_sip_voice`, `13_protocol_sip_media_port_range`, and `18_public_status_notifications` exercise SIP signaling/media and status notification protection.
+
+Business story: A protocol-level event hits SIP voice, or a mixed event pressures public status notification endpoints. The communications lead needs real-time coordination and public status updates preserved. The compiler treats `sip_voice` and `emergency_status_notifications` as P0, using trusted-source and prioritization candidates rather than shedding.
+
+ROI mechanism: Communications continuity reduces coordination delay, customer uncertainty, and support contact volume. It can also prevent a technical incident from becoming a reputational incident.
+
+Why credible: The generated input distinguishes ordinary status/static content from emergency status notifications. It also models SIP ports, UDP, port ranges, trusted SIP trunks, and communications ownership.
+
+### Story 5: Lock down administrative access without locking out recovery
+
+Personas: incident commander, network operations lead, security operations lead, GRC/change manager.
+
+Scenario evidence: `05_admin_access_restriction` targets `admin_access`. The output includes `ALLOW_TRUSTED_SOURCES` and `DENY_UNTRUSTED`, both high risk.
+
+Business story: Administrative access is being pressured. Security wants to restrict access. Network operations worries about locking out the people needed to recover. The incident commander needs explicit approval and evidence. The compiler narrows the conversation: preserve trusted admin sources, deny untrusted only with explicit approval, TTL, and rollback.
+
+ROI mechanism: The value is avoiding two bad outcomes: broad admin exposure during an incident or self-inflicted admin lockout. Either can prolong downtime and increase operational risk.
+
+Why credible: The service is P1, `RESTRICT_TO_TRUSTED`, has `approval_required`, has trusted source groups, and high-risk actions are surfaced with operator questions.
+
+### Story 6: Avoid a self-inflicted outage from a null-route on a shared endpoint
+
+Personas: network operations lead, service owner, incident commander, GRC/change manager, executive sponsor.
+
+Scenario evidence: `06_low_priority_null_route_candidate` allows a null-route review for `media_downloads`. `07_low_priority_null_route_collateral` blocks null-route on `shared_static_site` because the destination is shared with another service, creating `NULL_ROUTE_COLLATERAL_RISK`.
+
+Business story: Network operations considers a null-route for an attacked low-priority endpoint. On a dedicated media-download endpoint, the compiler allows a critical-risk review item with TTL and rollback. On a shared endpoint, it blocks the null-route because the action would affect multiple services.
+
+ROI mechanism: Avoiding a single self-inflicted shared-endpoint outage can be worth more than the tool itself. Emergency network actions often create collateral damage when ownership and shared infrastructure are unclear.
+
+Why credible: The blocker is code-enforced. Null-route is critical risk, explicitly allowed only by flag, blocked for P0/P1, TTL-limited, and blocked when multiple services share a destination.
+
+### Story 7: Turn readiness from a meeting artifact into a measurable control
+
+Personas: executive sponsor, incident commander, service owners, GRC/change manager, network operations lead.
+
+Scenario evidence: The readiness report scores service-priority completeness and returns 100% readiness in the generated audit bundle. It checks owners, approvers, rollback controls, P0/P1 trusted sources, low-priority degradation policy, endpoint operational metadata, trusted-source review metadata, and traffic baselines.
+
+Business story: Before the next DDoS event, leadership asks whether the organization knows what can be degraded. Instead of a spreadsheet debate, the team runs readiness. Gaps become concrete: missing owner, missing approver, missing rollback, missing trusted source, no degradation policy, missing endpoint metadata.
+
+ROI mechanism: This reduces incident-prep labor and prevents the most expensive decision-making from happening for the first time during an outage. It also creates a governance artifact that can be reviewed by risk and executive stakeholders.
+
+Why credible: This maps directly to NIST's framing of incident response as integrated cyber risk management, and CISA's emphasis on mission/reputation-prioritized DDoS mitigation.
+
+### Story 8: Give support and business teams a principled degradation sequence
+
+Personas: support operations lead, customer-facing business owner, application operations lead, incident commander.
+
+Scenario evidence: `support_portal` is P3, `report_export` is P3, `public_marketing_site` and `media_downloads` are P4, while auth/payment/VPN/SIP/monitoring/status notifications are P0/P1.
+
+Business story: During overload, the support lead wants to know whether support portal degradation is acceptable. The business owner wants to preserve core customer journeys. Application operations needs concrete candidates. The compiler shows the sequence: preserve authentication and payment, then degrade support/report/public/download traffic according to predeclared business impact.
+
+ROI mechanism: This avoids equal treatment of unequal workflows. It reduces customer harm by keeping critical transactions and communications alive while shedding lower-value work.
+
+Why credible: Google SRE guidance supports criticality-aware request rejection and load shedding. The repo operationalizes that pattern with P0-P4 priority, allowed actions, and business impact language.
+
+### Story 9: Prevent action on weak or unmapped evidence
+
+Personas: security operations lead, incident commander, service owner, GRC/change manager.
+
+Scenario evidence: `08_missing_ports_low_confidence` lowers confidence when ports are missing. `09_unmapped_target` generates monitor-only output for an observed target that is not mapped to a service.
+
+Business story: Security sees a target under pressure but the event lacks enough service context. The compiler refuses to guess. It asks what service owns the target and marks the result for review instead of emitting a risky action.
+
+ROI mechanism: False-positive mitigation can create real outages. A monitor-only path avoids damaging an unknown service or dependency while still preserving the evidence for rapid service mapping.
+
+Why credible: The matcher requires IP/protocol/port overlap. CIDR and missing-port cases reduce confidence. Unmapped targets are not silently dropped; they become review items.
+
+### Story 10: Close the incident with evidence, not memory
+
+Personas: GRC/change manager, incident commander, network operations lead, service owners, executive sponsor.
+
+Scenario evidence: `post_incident_diff.json` compares intended actions against actual changes. It records applied, skipped, not recorded, and missing rollback evidence.
+
+Business story: After the incident, the GRC/change manager asks what was actually applied and whether it was rolled back. The network lead has action IDs and rollback IDs. The service owner can see skipped and accepted actions. The incident commander has lessons learned tied to concrete action IDs.
+
+ROI mechanism: This reduces audit labor, reduces stale emergency-policy risk, and improves the next tabletop. It also makes the compiler more valuable over time because post-incident diffs become policy feedback.
+
+Why credible: Rollback is not a paragraph in a report. It is structured output with owner, deadline, verification steps, evidence requirements, and post-incident comparison.
+
+## ROI model that is realistic and defensible
+
+High ROI comes from four mechanisms:
+
+1. Reduced decision latency.
+   During severe DDoS or overload, human bridge time is expensive and slow. A precompiled candidate set can compress "what can we safely degrade?" from ad hoc debate into review of a small, evidence-backed action list.
+
+2. Reduced blast radius.
+   The compiler pushes degradation toward lower-priority services and blocks unsafe actions like null-route on shared endpoints. Avoiding self-inflicted outage expansion is often more valuable than generating a clever mitigation.
+
+3. Preserved critical workflows.
+   Auth, payment, VPN/admin access, monitoring, SIP voice, and emergency status notifications have explicit P0/P1 treatment. The value is keeping revenue, recovery, and communications paths alive while sacrificing lower-priority capacity.
+
+4. Lower audit and recovery cost.
+   TTL, rollback owner, evidence, approval bundle, fingerprints, and post-incident diff reduce the long tail of emergency-change cleanup.
+
+The ROI should be stated as avoided and shortened outage impact, not guaranteed savings. Uptime Institute's outage-cost data makes the stakes credible, but the tool's financial value depends on the adopting organization's revenue per minute, customer-impact profile, incident frequency, and operational maturity.
+
+## Why the stories are credible
+
+- The generated input uses realistic service roles, not generic placeholders.
+- The generated events cover volumetric, protocol, application, mixed, unknown, active, detected, stable, escalated, and ended states.
+- The output includes all action types and all risk levels.
+- The tool has specific safety behavior for dangerous actions.
+- The repo explicitly avoids live enforcement, credentials, external calls, and claims of protection.
+- The data generator includes negative fixtures, redaction, schemas, fingerprints, strict-mode outputs, readiness reports, tabletop artifacts, and post-incident diffing.
+
+## What this can become as core technology
+
+The compelling product direction is not "better markdown reports." It is an incident-policy decision layer:
+
+- Inputs: normalized event telemetry, service-priority contract, trusted-source profiles, policy packs, endpoint inventory, approval matrix, rollback controls.
+- Core: deterministic policy compilation, risk scoring, confidence scoring, action grouping, TTL/rollback planning, safety blockers, evidence packaging.
+- Outputs: decision brief, operator queue, approval queue, blocked-action list, rollback clock, machine-readable plan, rollback plan, decision trace, audit bundle, redacted demo bundle.
+- Future integrations: ticketing, chatops, SOAR, change management, network automation, app-edge policy, service catalog, CMDB, and incident analytics.
+
+The defensible moat would come from the service-priority contract, policy-pack language, safety rules, post-incident feedback, and a growing library of realistic scenario packs. The implementation already has the skeleton of that moat.
+
+## Demo narrative
+
+Use this talk track:
+
+1. "A DDoS event is not just a traffic problem. It is a business-priority problem under time pressure."
+2. "Here is the service-priority contract: P0/P1 services are preserved; P3/P4 services can degrade; every service has owners, approvers, and rollback."
+3. "Here is a mixed incident: auth, support, public web, and report export are all under pressure."
+4. "The compiler produces a decision package, not commands: protect auth, degrade report/public flows, flag high-risk actions, ask operator questions, and enforce TTL."
+5. "Now see the safety behavior: a null-route on a dedicated low-priority endpoint is reviewable, but a null-route on a shared endpoint is blocked."
+6. "After the incident, the post-incident diff tells us what was applied, skipped, missing, and lacking rollback evidence."
+7. "The business value is reduced decision latency, reduced blast radius, preserved critical workflows, and better auditability."
+
+## Bottom line
+
+The highest-value business story is:
+
+"When a DDoS or severe overload event hits multiple services, brownout-policy-compiler gives the incident commander, network lead, security lead, service owners, and GRC lead a deterministic, business-aware, rollback-safe set of temporary brownout candidates so critical workflows stay available while lower-priority services are intentionally degraded under review."
+
+That story is realistic, credible, and high ROI because it aligns with current DDoS trends, NIST incident-response guidance, CISA mission-impact guidance, SRE overload patterns, and outage-cost data.

@@ -1,0 +1,7 @@
+workload_name,fqdn,ip_addresses,protected,recovery_set,include_in_recovery_set,aliases,role_tags,application_owner,owner_team,business_service,criticality,recovery_tier,dependency_owner,environment,site,notes
+app01,app01.apps.example.internal,10.0.1.10,true,dr-test-001,true,app01-short,application,order-owner,application-team,order-entry,tier-1,0-4h,application-team,prod,primary,
+app02,app02.apps.example.internal,10.0.1.11,true,dr-test-001,true,app02-short,application,order-owner,application-team,order-entry,tier-1,0-4h,application-team,prod,primary,
+dc01,dc01.corp.example.internal,10.0.0.20,true,core-services,false,,domain_controller;kerberos;global_catalog,identity-owner,identity-team,core-infrastructure,tier-1,0-4h,identity-team,prod,primary,Required identity platform dependency outside declared recovery set.
+sql01,sql01.apps.example.internal,10.0.2.30,true,data-services,false,,database,database-owner,database-team,order-entry,tier-1,0-4h,database-team,prod,primary,Shared database omitted from test recovery set.
+files01,files01.apps.example.internal,10.0.3.40,true,shared-services,false,,file_server,storage-owner,storage-team,shared-document-services,tier-2,4-24h,storage-team,prod,primary,
+dns01,dns01.example.internal,10.0.0.10,true,core-services,false,,dns_resolver,network-owner,network-team,core-infrastructure,tier-1,0-4h,network-team,prod,primary,Required resolver outside declared recovery set.

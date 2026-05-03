@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gpu-rack-qualifier/summary.schema.json",
+  "title": "gpu-rack-qualifier summary",
+  "type": "object",
+  "required": ["cluster_id", "rack_id", "generated_at", "policy_id", "mode", "input", "qualification", "labels", "blockers", "warnings", "top_operator_questions", "business_impact", "readiness", "coverage", "action_queue_counts", "outputs"],
+  "additionalProperties": true,
+  "properties": {
+    "cluster_id": {"type": ["string", "null"]},
+    "rack_id": {"type": ["string", "null"]},
+    "generated_at": {"type": "string"},
+    "policy_id": {"type": "string"},
+    "mode": {"const": "REVIEW_ONLY"},
+    "input": {"type": "object", "additionalProperties": {"type": "integer"}},
+    "qualification": {"type": "object", "additionalProperties": {"type": "integer"}},
+    "labels": {"type": "object", "additionalProperties": {"type": "integer"}},
+    "blockers": {"type": "object", "additionalProperties": {"type": "integer"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "top_operator_questions": {"type": "array", "items": {"type": "string"}},
+    "business_impact": {"type": "object"},
+    "readiness": {"type": "object", "additionalProperties": {"type": "integer"}},
+    "coverage": {"type": "object"},
+    "action_queue_counts": {"type": "object", "additionalProperties": {"type": "integer"}},
+    "outputs": {"type": "object"}
+  }
+}

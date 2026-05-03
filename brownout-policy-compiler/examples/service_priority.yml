@@ -1,0 +1,134 @@
+organization:
+  name: Example Organization
+  default_ttl_minutes: 30
+  maintenance_contact: noc@example.invalid
+
+trusted_sources:
+  noc_vpn:
+    description: NOC and admin source ranges
+    cidrs:
+      - 10.10.0.0/16
+      - 192.0.2.10/32
+
+  payment_gateways:
+    description: Payment partner source ranges
+    cidrs:
+      - 192.0.2.50/32
+      - 192.0.2.51/32
+
+  sip_trunks:
+    description: Voice carrier trunks
+    cidrs:
+      - 192.0.2.60/32
+
+  monitoring_collectors:
+    description: Monitoring and observability sources
+    cidrs:
+      - 192.0.2.70/32
+
+service_groups:
+  - id: sip_voice
+    display_name: SIP voice
+    priority: P0
+    brownout_mode: PROTECT
+    endpoints:
+      - name: sip_edge
+        ip: 203.0.113.30
+        protocol: udp
+        ports: [5060, 5061, 10000-20000]
+    trusted_source_groups:
+      - sip_trunks
+    max_ttl_minutes: 30
+    allowed_actions:
+      - ALLOW_TRUSTED_SOURCES
+      - RATE_LIMIT_UNTRUSTED
+      - PRIORITIZE
+    rollback_required: true
+
+  - id: vpn_access
+    display_name: VPN access
+    priority: P0
+    brownout_mode: PROTECT
+    endpoints:
+      - name: vpn_vip
+        ip: 203.0.113.20
+        protocol: udp
+        ports: [500, 4500]
+    trusted_source_groups:
+      - noc_vpn
+    max_ttl_minutes: 30
+    allowed_actions:
+      - ALLOW_TRUSTED_SOURCES
+      - RATE_LIMIT_UNTRUSTED
+      - PRIORITIZE
+    rollback_required: true
+
+  - id: monitoring
+    display_name: Monitoring and alerting
+    priority: P0
+    brownout_mode: PROTECT
+    endpoints:
+      - name: monitoring_ingest
+        ip: 203.0.113.40
+        protocol: tcp
+        ports: [443]
+    trusted_source_groups:
+      - monitoring_collectors
+    max_ttl_minutes: 30
+    allowed_actions:
+      - ALLOW_TRUSTED_SOURCES
+      - PRIORITIZE
+    rollback_required: true
+
+  - id: admin_access
+    display_name: Administrative access
+    priority: P1
+    brownout_mode: RESTRICT_TO_TRUSTED
+    endpoints:
+      - name: admin_portal
+        ip: 203.0.113.50
+        protocol: tcp
+        ports: [443, 22]
+    trusted_source_groups:
+      - noc_vpn
+    max_ttl_minutes: 20
+    allowed_actions:
+      - ALLOW_TRUSTED_SOURCES
+      - DENY_UNTRUSTED
+    rollback_required: true
+    approval_required: true
+
+  - id: payment
+    display_name: Payment endpoints
+    priority: P1
+    brownout_mode: PROTECT
+    endpoints:
+      - name: payment_api
+        ip: 203.0.113.60
+        protocol: tcp
+        ports: [443]
+    trusted_source_groups:
+      - payment_gateways
+    max_ttl_minutes: 30
+    allowed_actions:
+      - ALLOW_TRUSTED_SOURCES
+      - RATE_LIMIT_UNTRUSTED
+      - PRIORITIZE
+    rollback_required: true
+
+  - id: public_marketing_site
+    display_name: Public marketing site
+    priority: P4
+    brownout_mode: SHED
+    endpoints:
+      - name: public_web_vip
+        ip: 203.0.113.10
+        protocol: tcp
+        ports: [80, 443]
+    max_ttl_minutes: 15
+    allowed_actions:
+      - RATE_LIMIT
+      - CHALLENGE
+      - SHED_LOW_PRIORITY
+    rollback_required: true
+

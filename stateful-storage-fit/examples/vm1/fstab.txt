@@ -1,0 +1,4 @@
+# synthetic example
+UUID=root / ext4 defaults 0 1
+/dev/sdb1 /data xfs defaults 0 2
+

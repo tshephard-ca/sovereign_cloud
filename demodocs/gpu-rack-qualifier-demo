@@ -1,0 +1,1038 @@
+# gpu-rack-qualifier demo: business stories, personas, ROI, and evidence
+
+Current repo docs now split the demo into cleaner artifacts:
+
+- `gpu-rack-qualifier/docs/demo_walkthrough.md`
+- `gpu-rack-qualifier/docs/business_cases.md`
+- `gpu-rack-qualifier/docs/architecture.md`
+
+Use those files for the active product walkthrough. The notes below remain a longer research and review appendix.
+
+Generated from local repo review, deterministic generated data, generated output analysis, pytest validation, and web research on 2026-05-01.
+
+Local subdirectory reviewed: `gpu-rack-qualifier`
+
+## Executive thesis
+
+`gpu-rack-qualifier` is best positioned as an AI infrastructure qualification control plane, not a report generator.
+
+It answers a narrow and commercially important question:
+
+> Which GPU nodes are safe candidates for multi-node training, which should be limited to inference or single-node work, and which should be reviewed before scheduling because qualification evidence shows communication, topology, firmware, GPU-count, or sensor risk?
+
+The product's value comes from the gap between "the rack was delivered" and "the rack is safe to expose to expensive AI workloads through the scheduler." A GPU rack can be powered on and still waste high-value capacity if any of the following are wrong:
+
+- NCCL all-reduce correctness
+- pairwise NCCL bandwidth
+- GPU-to-GPU or GPU-to-NIC topology
+- expected GPU count
+- driver/CUDA/VBIOS consistency
+- ECC or MIG mode
+- BMC health
+- fan health
+- temperature and power sensor state
+- evidence coverage and parser quality
+
+The repo turns this evidence into review-only Slurm-facing labels, quarantine recommendations, portfolio summaries, drift reports, handoff bundles, and business-impact counters. That is a core workflow for AI cluster commissioning and ongoing rack qualification.
+
+## External market and technical context
+
+The web research supports the repo's problem framing.
+
+- NVIDIA's GB200 NVL72 page describes a rack-scale, liquid-cooled system with 36 Grace CPUs and 72 Blackwell GPUs in a single NVLink domain. It also describes 130 TB/s of low-latency GPU communication and explicitly says NVLink and liquid cooling help overcome communication bottlenecks. Source: https://www.nvidia.com/en-us/data-center/gb200-nvl72/
+- NVIDIA's NCCL documentation says NCCL provides topology-aware inter-GPU communication primitives, including AllReduce, and supports fast collectives over multiple GPUs within and across nodes. It also notes that efficient neural network training is possible with NCCL's multi-GPU and multi-node communication. Source: https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/overview.html
+- Slurm documentation supports the repo's scheduler-facing strategy: node extra data and constraints can be used to filter jobs based on node attributes, while `scontrol` can view or modify Slurm configuration and state. Source: https://slurm.schedmd.com/extra_constraints.html and https://slurm.schedmd.com/scontrol.html
+- DMTF Redfish is a standard for simple, secure, human-readable and machine-capable infrastructure management; DMTF also publishes Redfish guidance for liquid cooling, power distribution, firmware update, telemetry, and schemas. This makes Redfish-like BMC sensor snapshots a credible evidence input. Source: https://www.dmtf.org/standards/redfish
+- IEA's 2025 Energy and AI report says there is "no AI without energy," that AI-focused data centers are power hungry, and that a typical AI-focused data center can consume as much electricity as 100,000 households. It also says global data center investment nearly doubled since 2022 and reached about half a trillion dollars in 2024, while data center electricity consumption is projected to more than double by 2030. Source: https://www.iea.org/reports/energy-and-ai/executive-summary
+- Uptime Institute's 2024 outage analysis says 54% of respondents' most recent significant, serious, or severe outage cost more than $100,000, 16% cost more than $1 million, power issues are the most common cause of serious/severe data center outages, network issues are the largest single cause of IT service outages, and four in five serious outages could have been prevented with better management, processes, and configuration. Source: https://intelligence.uptimeinstitute.com/resource/annual-outage-analysis-2024
+
+The realistic ROI claim is not "this tool guarantees training success." It is:
+
+> The tool reduces wasted accelerator hours, bad scheduler placement, failed commissioning cycles, unplanned drains, thermal/fan risk, firmware drift, and support escalation time by making qualification evidence deterministic, reviewable, scheduler-facing, and auditable.
+
+## What the local repo actually contains
+
+The README describes `gpu-rack-qualifier` as a local-first CLI that converts GPU communication, topology, and sensor evidence into scheduler-facing node labels and quarantine recommendations.
+
+The tool consumes:
+
+- NCCL single-node all-reduce output
+- user-supplied pairwise NCCL CSV
+- `nvidia-smi topo -m`
+- optional `nvidia-smi topo -p2p n`
+- `nvidia-smi -q -x` XML
+- Redfish-like BMC sensor JSON
+- optional node inventory YAML
+- optional qualification policy YAML
+
+It writes:
+
+- Slurm node labels CSV
+- quarantine/review CSV
+- commented Slurm feature snippet
+- commented drain-review script
+- summary JSON
+- evidence bundle JSON
+- markdown explanation
+- rack portfolio
+- baseline and drift reports
+- business impact report
+- coverage report
+- handoff bundle ZIP
+
+It explicitly does not schedule jobs, manage Slurm, update firmware, reboot hosts, run cluster-wide tests, connect to BMCs, store credentials, call external services, or enforce quarantine. That review-only boundary is commercially important because it makes the output usable in real operations without handing control of production infrastructure to a new tool.
+
+## Generated input deep dive
+
+I generated deterministic synthetic input data:
+
+```bash
+PYTHONPATH=src python3 -m gpu_rack_qualifier.cli generate-fixtures \
+  --output-dir /tmp/gpu-rack-qualifier-demo-generated \
+  --nodes 64 \
+  --gpus-per-node 8 \
+  --scenario mixed_commissioning \
+  --seed 7
+```
+
+Generated tree:
+
+- `/tmp/gpu-rack-qualifier-demo-generated/qualification_policy.yml`
+- `/tmp/gpu-rack-qualifier-demo-generated/node_inventory.yml`
+- `/tmp/gpu-rack-qualifier-demo-generated/evidence/<node>/...`
+- `/tmp/gpu-rack-qualifier-demo-generated/expected/...`
+
+The generated inventory represents:
+
+- 64 nodes
+- 8 expected GPUs per node
+- one generated cluster
+- one generated rack
+- switch groups every 8 nodes
+- fabric groups every 16 nodes
+- expected roles of training and inference
+- expected driver `>=550.0`
+- expected CUDA `>=12.0`
+- expected MIG mode disabled
+- expected ECC mode enabled
+
+The generated evidence includes:
+
+- single-node NCCL all-reduce output for every node
+- pairwise NCCL CSV for 59 of 64 nodes
+- topology output for 62 of 64 nodes
+- P2P topology output for 62 of 64 nodes
+- `nvidia-smi -q -x` XML for every node, including malformed XML cases
+- BMC Redfish-like sensor JSON for every node
+- collection metadata for every node
+
+The generated scenarios are realistic commissioning and operations cases:
+
+- pass
+- missing pairwise NCCL
+- weak pairwise NCCL
+- weak topology path
+- topology review path
+- BMC warning
+- NCCL correctness error
+- nonzero NCCL wrong count
+- NCCL timeout
+- missing GPU
+- VBIOS mismatch
+- CUDA drift
+- ECC mismatch
+- MIG mismatch
+- missing topology
+- malformed NCCL output
+- malformed `nvidia-smi` XML
+- rack-wide slow baseline
+- partial evidence
+- BMC critical
+- temperature warning
+- temperature critical
+- sensor critical
+- fan failure
+- driver drift
+
+This generated input is valuable because it exercises real operational failure modes without using real customer, provider, or server-vendor data.
+
+## Code deep dive
+
+### Core models
+
+`src/gpu_rack_qualifier/models.py` defines typed models for:
+
+- NCCL samples and aggregate NCCL results
+- pairwise NCCL records and aggregate pairwise results
+- topology matrices
+- GPU identity and health from `nvidia-smi`
+- BMC sensors and BMC snapshots
+- expected inventory
+- node inventory
+- qualification policy
+- derived node features
+- qualification result
+- Slurm label rows
+- quarantine rows
+- summary output
+
+This gives the repo a strong internal contract. It is not just text parsing into ad hoc reports.
+
+### Evidence generation
+
+`src/gpu_rack_qualifier/fixtures.py` generates full fixture trees and expected outputs. It includes scenario-specific behavior for:
+
+- NCCL timeouts
+- correctness errors
+- nonzero wrong counts
+- weak bandwidth
+- missing pairwise evidence
+- missing topology
+- malformed NCCL
+- malformed XML
+- missing GPU
+- VBIOS drift
+- CUDA drift
+- ECC drift
+- MIG drift
+- BMC warnings
+- critical BMC health
+- temperature thresholds
+- fan failure
+
+The generator calls the same qualification path used by the CLI to write expected outputs. This matters because demo input and test fixtures stay tied to the actual product behavior.
+
+### Feature derivation
+
+`src/gpu_rack_qualifier/features.py` turns raw evidence into deterministic features:
+
+- actual GPU count vs expected GPU count
+- driver and CUDA versions
+- VBIOS consistency
+- MIG/ECC summaries
+- single-node NCCL status and bandwidth
+- peer-relative bandwidth percentage
+- pairwise NCCL status, weak peer count, timeout count, and p50 bandwidth
+- weak/review topology path counts
+- P2P NVLink missing count
+- BMC warning/critical/fan/temperature indicators
+- firmware mismatch count
+- confidence
+- reason codes
+- blockers
+- warnings
+- suggested operator questions
+
+The code is careful about evidence honesty. For example, peer-relative thresholds can warn on underperformers, but the markdown report explicitly caveats that peer-relative thresholds can hide rack-wide underperformance.
+
+### Rule engine and labels
+
+`src/gpu_rack_qualifier/rules.py` classifies each node into:
+
+- `PASS`
+- `REVIEW`
+- `INFERENCE_ONLY`
+- `AVOID_MULTINODE`
+- `QUARANTINE`
+
+Key behavior:
+
+- Correctness errors, timeouts, wrong counts, missing GPUs, BMC critical states, fan failures, temperature critical states, and VBIOS drain policy create quarantine blockers.
+- A node can pass single-node NCCL but still be labeled `AVOID_MULTINODE` when pairwise communication or topology evidence is weak.
+- A node can become `INFERENCE_ONLY` when pairwise evidence is missing and policy requires pairwise NCCL before multi-node training labels.
+- Review-only labels are generated rather than applied.
+
+This is the core product: an evidence-to-placement decision engine for GPU racks.
+
+### Quarantine and scheduler handoff
+
+`src/gpu_rack_qualifier/quarantine.py` translates qualification results into review recommendations:
+
+- `NONE`
+- `REVIEW`
+- `INFERENCE_ONLY`
+- `AVOID_MULTINODE`
+- `QUARANTINE_REVIEW`
+
+It also supplies:
+
+- severity
+- confidence
+- primary reason
+- suggested Slurm state
+- drain reason
+- operator action
+- suggested operator question
+
+This gives each finding an operational next step.
+
+### Business impact
+
+`src/gpu_rack_qualifier/business_impact.py` builds counters:
+
+- nodes without multi-node label
+- review-load nodes
+- quarantine-review nodes
+- avoid-multinode nodes
+- inference-only nodes
+- qualification counts
+- recommendation counts
+
+It can also compute an operator-supplied value-at-risk estimate using:
+
+```text
+nodes_without_multinode_label * gpus_per_node * hours_at_risk * accelerator_hour_value
+```
+
+The caveat is explicit: the tool does not invent financial value. The operator supplies assumptions.
+
+### Portfolio, baseline, drift, evidence bundle, and handoff
+
+The repo includes modules for:
+
+- `portfolio.py`: aggregate view of business-impact counters, top blockers, top warnings, review nodes, and operator questions.
+- `baseline.py`: create a point-in-time qualification snapshot and compare later runs for drift.
+- `coverage_report.py`: report input coverage, parser quality, and signal coverage.
+- `evidence_bundle.py`: create a versioned manifest with hashes and per-node evidence status.
+- `handoff.py`: package outputs, schemas, docs, scripts, and evidence bundle into a ZIP for review.
+- `redact.py`: support redacted output.
+- `schema_validation.py`: validate policy, inventory, summary, labels, quarantine, evidence bundle, Slurm fragment, and drain review artifacts.
+- `planning.py`: generate pairwise NCCL plans and sbatch templates for review.
+
+These modules move the repo from "one report" toward an operational qualification product.
+
+## Generated output deep dive
+
+I ran the generated evidence through the CLI:
+
+```bash
+PYTHONPATH=src python3 -m gpu_rack_qualifier.cli qualify \
+  --evidence /tmp/gpu-rack-qualifier-demo-generated/evidence \
+  --node-inventory /tmp/gpu-rack-qualifier-demo-generated/node_inventory.yml \
+  --policy /tmp/gpu-rack-qualifier-demo-generated/qualification_policy.yml \
+  --output-labels /tmp/gpu-rack-qualifier-demo-run/slurm_node_labels.csv \
+  --output-quarantine /tmp/gpu-rack-qualifier-demo-run/quarantine.csv \
+  --output-slurm-fragment /tmp/gpu-rack-qualifier-demo-run/slurm_features.conf.snippet \
+  --output-drain-review /tmp/gpu-rack-qualifier-demo-run/drain_review.sh \
+  --summary /tmp/gpu-rack-qualifier-demo-run/summary.json \
+  --evidence-bundle /tmp/gpu-rack-qualifier-demo-run/evidence_bundle.json
+```
+
+CLI warnings:
+
+- `node015`: topology evidence missing
+- `node040`: topology evidence missing
+
+### Summary counters
+
+Input counters:
+
+- nodes seen: 64
+- nodes with single-node NCCL: 64
+- nodes with pairwise NCCL: 59
+- nodes with topology: 62
+- nodes with `nvidia-smi` XML: 64
+- nodes with BMC snapshot: 64
+
+Qualification counters:
+
+- PASS: 3
+- REVIEW: 25
+- INFERENCE_ONLY: 5
+- AVOID_MULTINODE: 8
+- QUARANTINE: 23
+
+Label counters:
+
+- `gpu_training_multinode_ok`: 24
+- `gpu_training_single_node_ok`: 32
+- `gpu_inference_ok`: 31
+- `gpu_avoid_multinode`: 13
+- `gpu_do_not_schedule`: 23
+
+Business-impact counters:
+
+- evidence coverage: 97.81%
+- nodes without multi-node label: 40
+- avoid-multinode nodes: 8
+- inference-only nodes: 5
+- quarantine-review nodes: 23
+- nodes with blockers: 23
+- nodes with warnings: 41
+- review questions generated: 12
+
+Confidence counters:
+
+- HIGH: 50
+- MEDIUM: 12
+- LOW: 2
+
+### Top blockers
+
+- NCCL correctness error: 6
+- BMC health critical: 6
+- BMC temperature critical: 4
+- NCCL wrong count nonzero: 3
+- NCCL timeout: 3
+- GPU count below expected: 3
+- VBIOS mismatch drain policy: 3
+- BMC fan failure: 2
+
+### Top warnings
+
+- partial evidence: 7
+- weak topology path: 6
+- missing pairwise NCCL: 5
+- weak pairwise NCCL: 5
+- BMC temperature warning: 5
+- NCCL parse failed: 5
+- small NCCL sample: 5
+- topology review path: 3
+- BMC health warning: 3
+- pairwise NCCL timeout: 3
+- CUDA version mismatch: 3
+- ECC mode mismatch: 3
+- MIG mode mismatch: 3
+- required topology missing: 2
+- GPU count missing: 2
+
+### Coverage report
+
+File coverage:
+
+- BMC sensor JSON: 100%
+- collection metadata: 100%
+- single-node NCCL: 100%
+- `nvidia-smi` XML: 100%
+- pairwise NCCL: 92.19%
+- topology matrix: 96.88%
+- P2P topology: 96.88%
+
+Data gaps:
+
+- pairwise NCCL coverage is 92.19%, so reports should explain missing evidence
+- topology coverage is 96.88%, so reports should explain missing evidence
+- P2P topology coverage is 96.88%, so reports should explain missing evidence
+- some topology files are missing or unparsed
+- some `nvidia-smi` XML files are malformed or unparsed
+
+Signal coverage:
+
+- weak pairwise nodes: 5
+- weak topology nodes: 6
+- P2P missing nodes: 6
+- pairwise timeout nodes: 3
+- GPU count below expected nodes: 3
+- VBIOS mismatch nodes: 3
+- driver mismatch nodes: 2
+- CUDA mismatch nodes: 3
+- ECC mismatch nodes: 3
+- MIG mismatch nodes: 3
+- BMC critical nodes: 6
+- BMC warning nodes: 3
+- temperature critical nodes: 4
+- temperature warning or critical nodes: 9
+- fan failure nodes: 2
+- malformed NCCL nodes: 5
+- malformed XML nodes: 2
+
+### Business-impact estimate
+
+I ran:
+
+```bash
+PYTHONPATH=src python3 -m gpu_rack_qualifier.cli impact-report \
+  --summary /tmp/gpu-rack-qualifier-demo-run/summary.json \
+  --labels /tmp/gpu-rack-qualifier-demo-run/slurm_node_labels.csv \
+  --quarantine /tmp/gpu-rack-qualifier-demo-run/quarantine.csv \
+  --output-json /tmp/gpu-rack-qualifier-demo-run/business_impact.json \
+  --output-markdown /tmp/gpu-rack-qualifier-demo-run/business_impact.md \
+  --gpus-per-node 8 \
+  --hours-at-risk 24 \
+  --accelerator-hour-value 3.50
+```
+
+Operator-supplied estimate:
+
+- 40 nodes without multi-node label
+- 8 GPUs per node
+- 24 hours at risk
+- 3.50 value per accelerator-hour
+- estimated value at risk: 26,880
+
+This is intentionally not a price claim by the tool. It is a way for an operator to translate review counters into their own internal value-at-risk model.
+
+### Validation and packaging
+
+Additional generated workflows:
+
+- `explain` generated a markdown qualification summary.
+- `portfolio` generated a rack portfolio.
+- `coverage-report` generated data-quality and signal-coverage output.
+- `validate-schemas` returned `schema_validation=ok`.
+- `handoff-bundle` generated a ZIP with 19 files.
+- `qualify --redact` generated redacted labels, quarantine output, Slurm fragment, drain review, summary, and evidence bundle.
+- `generate-pairwise-plan --strategy ring` generated 64 pairs.
+- `pytest -q` passed: 53 tests passed in 5.02 seconds.
+
+## Personas
+
+### AI infrastructure director
+
+Owns the business outcome: getting GPU capacity into productive service without creating avoidable training failures, outage risk, or executive escalation.
+
+### Cluster operations lead
+
+Owns rack commissioning and day-to-day operational readiness. Needs deterministic evidence before broad scheduling.
+
+### Scheduler administrator
+
+Owns Slurm partitions, labels, constraints, drain workflows, and safe placement policy.
+
+### ML platform lead
+
+Owns user-facing training and inference platforms. Needs to prevent research and production teams from landing jobs on weak or risky nodes.
+
+### Fabric and network engineer
+
+Owns GPU communication paths, NIC paths, switch/fabric groups, and pairwise performance.
+
+### Facilities and power/cooling engineer
+
+Owns thermal, power, airflow, fan, liquid-cooling, and physical environment risk.
+
+### Firmware and systems engineer
+
+Owns driver, CUDA, VBIOS, ECC, MIG, and hardware identity consistency.
+
+### Procurement and finance partner
+
+Owns utilization, value-at-risk, vendor acceptance, and capital-efficiency narratives.
+
+### Vendor/OEM support manager
+
+Needs concise evidence bundles and reproduction context when escalating node or rack issues.
+
+### Security/compliance or audit lead
+
+Needs local-only, reviewable, redacted, hash-backed evidence without credentials or external calls.
+
+### Data science / model training owner
+
+Cares about job reliability, throughput, multi-node scaling, and avoiding failed long-running jobs.
+
+## Top business stories
+
+### 1. Commission a new GPU rack without exposing users to bad multi-node training nodes
+
+Personas:
+
+- AI infrastructure director
+- cluster operations lead
+- scheduler administrator
+- ML platform lead
+
+Story:
+
+A newly delivered 64-node GPU rack is physically installed and visible to the scheduler. The business pressure is to release capacity immediately because model teams are waiting. The operations team runs `gpu-rack-qualifier` before opening the rack broadly.
+
+Generated evidence:
+
+- only 3 of 64 nodes received `PASS`
+- 24 nodes received multi-node training labels
+- 40 nodes lacked a multi-node label
+- 23 nodes were quarantine-review candidates
+- 8 nodes were avoid-multinode candidates
+- 5 nodes were inference-only candidates
+
+Business impact:
+
+Instead of treating "rack installed" as "rack ready," the team opens only the nodes with sufficient evidence for the right workload class. Multi-node training lands only on nodes with compatible evidence; single-node and inference work can still use some lower-risk capacity. The business avoids failed commissioning cycles, wasted training time, and user distrust in the platform.
+
+Why the ROI is credible:
+
+The tool does not claim all non-PASS nodes are broken. It creates safe placement lanes. That prevents a common expensive failure mode: using a partially qualified rack for all workload types.
+
+### 2. Prevent weak pairwise communication from silently degrading distributed training
+
+Personas:
+
+- fabric and network engineer
+- ML platform lead
+- data science / model training owner
+- scheduler administrator
+
+Story:
+
+Distributed training jobs are sensitive to slow peers. A few weak fabric paths can pull down the effective throughput of the whole job. The generated run found 5 weak pairwise nodes, 6 weak topology nodes, 6 P2P missing nodes, and 8 avoid-multinode nodes.
+
+Business impact:
+
+The scheduler admin can label those nodes `gpu_avoid_multinode` instead of letting them join large training jobs. The fabric engineer receives specific questions: "Does this node have weaker pairwise NCCL performance with all peers or only specific peers?" and "Is this topology expected for the server model, or does it indicate a cabling/riser/fabric issue?"
+
+ROI path:
+
+Avoiding one poorly placed multi-node job can save hours or days of expensive accelerator time. More importantly, it protects user trust: model teams see that the platform distinguishes "usable GPU" from "safe for distributed training."
+
+### 3. Stop correctness-error nodes before they corrupt or invalidate expensive training runs
+
+Personas:
+
+- cluster operations lead
+- ML platform lead
+- data science / model training owner
+- vendor/OEM support manager
+
+Story:
+
+The generated output found 6 NCCL correctness-error blockers. The tool labeled those nodes `QUARANTINE` and produced `gpu_do_not_schedule` recommendations.
+
+Business impact:
+
+Correctness failures are qualitatively worse than ordinary slowness. A slow node wastes time; a correctness-risk node can invalidate a run and send teams into painful debugging. The tool gives operations a defensible reason to keep those nodes out of scheduling until GPU, driver, and fabric health are validated.
+
+ROI path:
+
+The avoided cost is not just accelerator hours. It includes model-team debugging time, bad experiment conclusions, delayed releases, and vendor escalation churn.
+
+### 4. Convert thermal and fan risk into pre-scheduling controls
+
+Personas:
+
+- facilities and power/cooling engineer
+- cluster operations lead
+- AI infrastructure director
+- scheduler administrator
+
+Story:
+
+The generated run found:
+
+- 6 BMC critical nodes
+- 4 temperature-critical nodes
+- 9 temperature warning or critical nodes
+- 2 fan failure nodes
+- 3 BMC warning nodes
+
+The tool created quarantine-review recommendations for critical sensor states and review labels for warnings.
+
+Business impact:
+
+AI racks concentrate power and cooling risk. The IEA notes that AI-focused data centers are power hungry and that data center electricity demand is growing quickly. NVIDIA's GB200 rack-scale systems also show how modern AI infrastructure concentrates dense GPU communication and cooling requirements. This makes sensor-driven placement controls commercially important.
+
+ROI path:
+
+The tool helps prevent a rack from turning thermal issues into job failures, emergency drains, hardware damage risk, or a facilities escalation after users have already started high-value jobs.
+
+### 5. Separate inference-safe capacity from multi-node-training-safe capacity
+
+Personas:
+
+- ML platform lead
+- scheduler administrator
+- AI infrastructure director
+- procurement and finance partner
+
+Story:
+
+The generated run produced 5 `INFERENCE_ONLY` nodes and 8 `AVOID_MULTINODE` nodes. These nodes are not automatically useless. They are not safe for broad multi-node training based on available evidence, but some may still be useful for inference, single-node training, or review partitions.
+
+Business impact:
+
+This protects revenue and utilization in both directions. The business avoids wasting distributed training jobs on weak nodes, while also avoiding unnecessarily idling every node that has a non-fatal issue.
+
+ROI path:
+
+The tool creates a more nuanced capacity posture than "up/down." In GPU environments, that distinction matters because inference, single-node experimentation, and multi-node training have different risk profiles.
+
+### 6. Detect firmware and software drift before it becomes a platform-wide support incident
+
+Personas:
+
+- firmware and systems engineer
+- cluster operations lead
+- vendor/OEM support manager
+- ML platform lead
+
+Story:
+
+The generated output found:
+
+- 3 VBIOS mismatch drain-policy blockers
+- 3 CUDA mismatch warnings
+- 2 driver mismatch warnings
+- 3 ECC mismatch warnings
+- 3 MIG mismatch warnings
+
+Business impact:
+
+The firmware engineer gets a deterministic list of nodes requiring review instead of discovering differences after a workload fails. The vendor/OEM support manager receives a handoff bundle with hashes and evidence context.
+
+ROI path:
+
+Firmware and software drift create expensive ambiguity. The tool reduces ambiguity by making the mismatch visible, tied to node identity, and associated with scheduler-facing consequences.
+
+### 7. Use evidence coverage to prevent false confidence during acceptance
+
+Personas:
+
+- AI infrastructure director
+- cluster operations lead
+- compliance/audit lead
+- procurement and finance partner
+
+Story:
+
+The generated run had 97.81% evidence coverage, but the coverage report still found 5 data gaps:
+
+- pairwise NCCL coverage was not complete
+- topology coverage was not complete
+- P2P topology coverage was not complete
+- some topology files were missing or unparsed
+- some XML files were malformed or unparsed
+
+Business impact:
+
+This keeps acceptance honest. A rack qualification report that hides missing evidence can cause leadership to believe the rack is ready when it is only partially tested.
+
+ROI path:
+
+The tool supports go/no-go decisions with evidence quality, not just pass/fail counts. That is valuable in acceptance, audit, vendor disputes, and production change control.
+
+### 8. Build a vendor escalation package in minutes instead of days
+
+Personas:
+
+- vendor/OEM support manager
+- cluster operations lead
+- firmware and systems engineer
+- facilities engineer
+
+Story:
+
+The handoff workflow created a ZIP bundle with 19 files, including labels, quarantine output, Slurm fragments, drain review, summary, policy, evidence bundle, docs, schemas, and scripts.
+
+Business impact:
+
+When a node has a correctness error, missing GPU, fan failure, or VBIOS mismatch, the operator can send a concise evidence package instead of manually collecting screenshots, terminal output, policy context, and ad hoc notes.
+
+ROI path:
+
+Vendor support cycles are expensive because they often begin with incomplete evidence. A standardized bundle shortens triage time and reduces repeated information requests.
+
+### 9. Keep scheduler admins in control while still giving them actionable artifacts
+
+Personas:
+
+- scheduler administrator
+- cluster operations lead
+- security/compliance lead
+
+Story:
+
+The tool generates commented Slurm feature snippets and commented drain-review scripts, but does not apply them. It also states that it does not know the full Slurm topology, partitions, GRES, or site policy.
+
+Business impact:
+
+This is operationally credible. Scheduler admins can review and adapt labels instead of being asked to trust an external tool with direct production control.
+
+ROI path:
+
+Adoption improves because the tool fits change-control workflows. It gives admins precise evidence and suggested labels without bypassing governance.
+
+### 10. Convert raw NCCL evidence into workload placement policy
+
+Personas:
+
+- ML platform lead
+- data science / model training owner
+- fabric engineer
+- scheduler administrator
+
+Story:
+
+NCCL evidence by itself is technical and low-level. The tool converts NCCL status, wrong counts, timeouts, bandwidth, peer-relative performance, and pairwise results into placement outcomes.
+
+Business impact:
+
+The ML platform lead can say: "These nodes are approved for multi-node training; these are inference-only; these should avoid multi-node jobs; these require quarantine review." That is a business-facing control derived from technical evidence.
+
+ROI path:
+
+This reduces the time between a communication test and a scheduling decision.
+
+### 11. Track rack drift after commissioning
+
+Personas:
+
+- cluster operations lead
+- firmware and systems engineer
+- facilities engineer
+- AI infrastructure director
+
+Story:
+
+The repo includes baseline creation and drift reporting. Drift mode detects status changes, Slurm feature changes, new blockers, new warnings, single-node bandwidth regressions, pairwise bandwidth regressions, firmware drift, sensor drift, and weak peer/fabric regression.
+
+Business impact:
+
+Commissioning is not a one-time event. Drivers change, firmware changes, fans fail, thermal profiles shift, and cables are moved. Baseline and drift turn rack qualification into an operational lifecycle.
+
+ROI path:
+
+Drift reports let operations catch degradation before user tickets, failed jobs, or incident bridges.
+
+### 12. Use pairwise planning to make fabric validation systematic
+
+Personas:
+
+- fabric and network engineer
+- cluster operations lead
+- scheduler administrator
+
+Story:
+
+The `generate-pairwise-plan --strategy ring` command created 64 pairwise NCCL plan rows for the generated inventory. The repo can also render an sbatch template for review.
+
+Business impact:
+
+Pairwise testing is often inconsistent when every operator chooses peers manually. A generated plan makes fabric validation repeatable and auditable.
+
+ROI path:
+
+Repeatability lowers missed weak links and makes before/after remediation evidence more credible.
+
+### 13. Support privacy-safe review and partner handoff
+
+Personas:
+
+- compliance/audit lead
+- vendor/OEM support manager
+- AI infrastructure director
+
+Story:
+
+The redacted run generated redacted labels, quarantine output, Slurm fragment, drain review, summary, and evidence bundle. This allows sharing without exposing internal names.
+
+Business impact:
+
+Partners, vendors, and executives can review patterns and severity without receiving full operational identity data.
+
+ROI path:
+
+This reduces friction for external support and procurement conversations.
+
+### 14. Make acceptance criteria explicit and machine-checkable
+
+Personas:
+
+- procurement and finance partner
+- AI infrastructure director
+- cluster operations lead
+- vendor/OEM support manager
+
+Story:
+
+The repo has policy YAML, schema validation, node inventory schema, evidence bundle schema, label schema, quarantine schema, and test coverage. Generated outputs are deterministic for a seed.
+
+Business impact:
+
+This helps turn acceptance from "the rack seems okay" into a repeatable checklist. Procurement can tie acceptance, remediation, and capacity release to objective evidence categories.
+
+ROI path:
+
+Clear acceptance evidence reduces dispute time and accelerates the moment when capital equipment becomes productive capacity.
+
+### 15. Present finance with value-at-risk without pretending the tool knows pricing
+
+Personas:
+
+- procurement and finance partner
+- AI infrastructure director
+- cluster operations lead
+
+Story:
+
+The generated impact report used operator-supplied assumptions:
+
+- 40 nodes without multi-node label
+- 8 GPUs per node
+- 24 hours at risk
+- 3.50 value per accelerator-hour
+
+Result:
+
+- 26,880 estimated value at risk
+
+Business impact:
+
+Finance can quickly model the cost of leaving nodes in an uncertain state. The tool does not invent prices or savings; it supplies the counts and lets the operator supply economics.
+
+ROI path:
+
+This makes the operational findings legible to budget owners while preserving data honesty.
+
+## Highest-value ROI cases
+
+### Case A: Commissioning delay avoidance
+
+The rack is installed but not yet accepted. Without a deterministic qualification workflow, teams can spend days reconciling inconsistent test output, support tickets, and scheduler state. With the tool, the team gets labels, quarantine review, coverage, portfolio, and handoff artifacts from the same evidence tree.
+
+ROI lever:
+
+- faster acceptance
+- fewer repeated tests
+- clearer vendor punch list
+- earlier partial release of safe capacity
+
+### Case B: Expensive training job failure avoidance
+
+A large distributed training job lands on nodes with weak pairwise NCCL, topology issues, or correctness errors. The job runs slowly, hangs, or produces invalid output.
+
+The tool's generated output shows exactly why this matters:
+
+- 6 correctness-error blockers
+- 3 timeout blockers
+- 5 weak pairwise warnings
+- 8 avoid-multinode nodes
+- 23 quarantine-review nodes
+
+ROI lever:
+
+- avoided accelerator waste
+- avoided model-team debugging
+- avoided delayed training milestones
+- reduced production risk
+
+### Case C: Thermal and facility risk avoidance
+
+Temperature critical, fan failure, and BMC critical signals are caught before broad scheduling.
+
+Generated output:
+
+- 4 temperature-critical nodes
+- 2 fan-failure nodes
+- 6 BMC critical nodes
+- 9 temperature warning or critical nodes
+
+ROI lever:
+
+- fewer emergency drains
+- reduced hardware risk
+- better coordination between facilities and platform teams
+- clearer evidence for cooling remediation
+
+### Case D: Vendor escalation acceleration
+
+The tool packages evidence and schemas into a handoff ZIP. It includes policy context, node status, reason codes, hashes, and generated artifacts.
+
+ROI lever:
+
+- fewer support loops
+- better reproduction detail
+- faster parts/firmware/cabling decisions
+- reduced engineering interruption
+
+### Case E: Ongoing drift management
+
+Baseline and drift reporting catch new blockers, warnings, firmware drift, sensor drift, and bandwidth regressions after commissioning.
+
+ROI lever:
+
+- fewer surprise regressions
+- faster root-cause narrowing
+- stronger change management
+- sustained trust in scheduler labels
+
+## Why these stories are realistic
+
+The stories are credible because they are grounded in three independent layers:
+
+1. External infrastructure reality:
+   - AI racks concentrate GPU, fabric, power, and cooling dependencies.
+   - NCCL is central to multi-GPU and multi-node training communication.
+   - Slurm supports scheduler-facing node attributes and constraints.
+   - Redfish is a credible standard for machine-readable infrastructure management.
+   - Data-center outages and delays are expensive.
+
+2. Local code behavior:
+   - The repo parses actual evidence classes that operators use.
+   - The policy engine maps evidence to deterministic placement statuses.
+   - Outputs are review-only and scheduler-facing.
+   - Evidence quality, redaction, schema validation, handoff, drift, and impact workflows are implemented.
+
+3. Generated output:
+   - The 64-node run produced realistic mixed states, not a toy all-pass output.
+   - The tool separated PASS, REVIEW, INFERENCE_ONLY, AVOID_MULTINODE, and QUARANTINE.
+   - It generated actionable operator questions and business-impact counters.
+
+## Limitations that should be stated honestly
+
+The tool is valuable, but the following limits should be clear in demos:
+
+- It does not prove workload success.
+- It does not run a full burn-in.
+- It does not apply Slurm state.
+- It does not query live BMCs in the qualification path.
+- It does not update firmware.
+- It does not diagnose root cause.
+- It does not know site-specific cooling capacity.
+- It does not know actual accelerator cost unless the operator supplies assumptions.
+- It does not replace observability, job telemetry, or long-running soak tests.
+- Peer-relative thresholds can hide rack-wide underperformance.
+- Sensor snapshots are point-in-time evidence.
+- Topology evidence is context, not performance proof.
+
+These limitations improve credibility. They prevent overclaiming and make the product easier to adopt in controlled environments.
+
+## Why this is core technology, not just reporting
+
+The defensible core is the evidence-to-placement decision layer.
+
+The repo already has the ingredients of a core technology product:
+
+- typed evidence model
+- deterministic parser stack
+- policy engine
+- confidence model
+- reason-code system
+- scheduler-facing label abstraction
+- quarantine recommendation model
+- evidence coverage reporting
+- schema validation
+- baseline and drift engine
+- evidence bundle and handoff format
+- redaction workflow
+- generated data for reproducible testing
+- review-only operating boundary
+
+The business impact comes from turning raw qualification artifacts into operational control signals. Reports are one output. The core technology is the qualification state machine that decides whether each node is safe for multi-node training, limited to inference/single-node work, or requires quarantine review.
+
+## Demo narrative
+
+A strong demo should follow this sequence:
+
+1. Generate a 64-node rack with mixed commissioning states.
+2. Show the generated inventory and evidence categories.
+3. Run `qualify`.
+4. Show that only 3 nodes fully passed, 24 received multi-node labels, 40 lacked multi-node labels, and 23 required quarantine review.
+5. Show top blockers: correctness errors, BMC critical, temperature critical, wrong counts, timeouts, missing GPUs, VBIOS mismatch, fan failure.
+6. Show top warnings: partial evidence, weak topology, missing pairwise NCCL, weak pairwise, sensor warnings, parse failures, CUDA/ECC/MIG drift.
+7. Show the Slurm fragment and emphasize it is commented and review-only.
+8. Show the quarantine CSV and operator questions.
+9. Show the portfolio and business impact report.
+10. Show coverage report and data gaps.
+11. Show schema validation.
+12. Show handoff bundle.
+13. Show redacted output for sharing.
+14. Tie the story back to capital productivity, avoided failed training jobs, acceptance workflow, and operational risk reduction.
+
+## Bottom line
+
+`gpu-rack-qualifier` has a strong business story when positioned as a GPU rack qualification and scheduler-readiness control. It should not be sold as a generic report generator, a monitoring system, or an automated scheduler controller.
+
+Its strongest value proposition is:
+
+> Before exposing expensive AI infrastructure to users, convert NCCL, topology, inventory, firmware, and sensor evidence into deterministic placement labels, quarantine-review recommendations, evidence quality, drift tracking, and stakeholder-ready handoff artifacts.
+
+That is a real, high-ROI story because GPU capacity is expensive, AI racks concentrate power/cooling/fabric risk, and failed distributed training wastes both accelerator time and scarce engineering attention.

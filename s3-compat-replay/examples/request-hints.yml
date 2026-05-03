@@ -1,0 +1,44 @@
+presigned:
+  observed: true
+  methods:
+    - GET
+  max_expiration_seconds: 3600
+
+cors:
+  origins:
+    - https://app.example.invalid
+  methods:
+    - GET
+    - PUT
+  request_headers:
+    - Content-Type
+    - x-amz-meta-client-id
+
+metadata_headers:
+  - x-amz-meta-client-id
+  - x-amz-meta-source-system
+
+object_tags:
+  examples:
+    - environment=test&app=orders
+
+content_types:
+  - application/pdf
+  - image/png
+
+conditional_requests:
+  if_none_match: true
+  if_match: true
+
+range_gets:
+  observed: true
+
+object_lock:
+  retention_mode: GOVERNANCE
+  legal_hold: false
+  retain_days: 1
+
+expected_error_shapes:
+  compare_xml_error_code: true
+  compare_http_status: true
+  compare_error_message: false

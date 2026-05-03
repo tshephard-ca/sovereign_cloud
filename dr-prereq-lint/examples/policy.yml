@@ -1,0 +1,17 @@
+window_hours: 24
+min_query_count: 2
+max_examples_per_finding: 5
+max_source_rows_per_finding: 20
+high_confidence_min_clients: 2
+repeated_observation_min_count: 5
+unmapped_client_warning_pct: 20
+require_resolver_identity_for_pass: true
+include_external_by_default: false
+
+severity:
+  directory_role_missing: CRITICAL
+  kerberos_role_missing: CRITICAL
+  dns_resolver_missing: CRITICAL
+  specific_target_missing: CRITICAL
+  known_prereq_missing: WARNING
+  heuristic_prereq_missing: REVIEW

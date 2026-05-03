@@ -1,0 +1,32 @@
+transaction_id: order_lookup
+display_name: Order Lookup
+endpoint_path: /transactions/order-lookup
+volatile_regions:
+  - screen_ref: "*"
+    row: 1
+    col: 65
+    length: 15
+    reason: clock_or_session_id
+fields:
+  - screen_ref: screen_001
+    field_id: f_04_32
+    name: order_number
+    role: input
+    type: string
+    required: true
+    sensitive: false
+    description: Order number entered by the operator.
+  - screen_ref: screen_003
+    field_id: f_05_32
+    name: customer_name
+    role: output
+    type: string
+    required: false
+    sensitive: false
+  - screen_ref: screen_003
+    field_id: f_06_32
+    name: order_status
+    role: output
+    type: string
+    required: false
+    sensitive: false

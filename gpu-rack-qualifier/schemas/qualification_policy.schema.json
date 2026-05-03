@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gpu-rack-qualifier/qualification_policy.schema.json",
+  "title": "gpu-rack-qualifier qualification policy",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "policy_id": {"type": "string"},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_nccl_single_node": {"type": "boolean"},
+        "require_topo": {"type": "boolean"},
+        "require_nvidia_smi_query": {"type": "boolean"},
+        "require_bmc_snapshot": {"type": "boolean"},
+        "require_pairwise_nccl_for_multinode_label": {"type": "boolean"},
+        "require_node_inventory": {"type": "boolean"}
+      }
+    },
+    "nccl": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "use_metric": {"enum": ["busbw_gbps", "algbw_gbps"]},
+        "peer_median_warning_pct": {"type": "number"},
+        "peer_median_fail_pct": {"type": "number"},
+        "min_single_node_busbw_gbps": {"type": ["number", "null"]},
+        "min_pairwise_busbw_gbps": {"type": ["number", "null"]},
+        "timeout_is_quarantine": {"type": "boolean"},
+        "correctness_error_is_quarantine": {"type": "boolean"},
+        "wrong_count_is_quarantine": {"type": "boolean"},
+        "min_message_size_bytes_for_scoring": {"type": "integer", "minimum": 1}
+      }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_nvlink_for_multinode_training": {"type": "boolean"},
+        "weak_gpu_gpu_paths": {"type": "array", "items": {"type": "string"}},
+        "review_gpu_gpu_paths": {"type": "array", "items": {"type": "string"}},
+        "weak_if_any_gpu_pair_weak": {"type": "boolean"},
+        "p2p_nvlink_expected": {"type": "boolean"}
+      }
+    },
+    "firmware": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_driver_consistency_across_rack": {"type": "boolean"},
+        "require_vbios_consistency_within_node": {"type": "boolean"},
+        "driver_mismatch_action": {"type": "string"},
+        "vbios_mismatch_action": {"type": "string"},
+        "cuda_mismatch_action": {"type": "string"}
+      }
+    },
+    "sensors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "health_warning_action": {"type": "string"},
+        "health_critical_action": {"type": "string"},
+        "fan_failure_action": {"type": "string"},
+        "temp_warning_celsius": {"type": "number"},
+        "temp_critical_celsius": {"type": "number"},
+        "power_warning_action": {"type": "string"},
+        "power_critical_action": {"type": "string"}
+      }
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pass_label": {"type": "string"},
+        "review_label": {"type": "string"},
+        "quarantine_label": {"type": "string"},
+        "inference_ok_label": {"type": "string"},
+        "single_node_training_ok_label": {"type": "string"},
+        "multi_node_training_ok_label": {"type": "string"},
+        "avoid_multinode_label": {"type": "string"},
+        "weak_link_label": {"type": "string"},
+        "firmware_review_label": {"type": "string"},
+        "sensor_review_label": {"type": "string"},
+        "do_not_schedule_label": {"type": "string"},
+        "allow_inference_when_quarantined": {"type": "boolean"},
+        "allow_pass_with_warnings": {"type": "boolean"}
+      }
+    },
+    "quarantine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "drain_on_correctness_error": {"type": "boolean"},
+        "drain_on_timeout": {"type": "boolean"},
+        "drain_on_sensor_critical": {"type": "boolean"},
+        "drain_on_missing_gpu": {"type": "boolean"},
+        "drain_on_vbios_mismatch": {"type": "boolean"}
+      }
+    }
+  }
+}

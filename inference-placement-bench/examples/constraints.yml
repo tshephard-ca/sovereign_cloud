@@ -1,0 +1,42 @@
+constraint_id: chat_support_ca_low_latency
+
+data_location:
+  allowed_countries:
+    - CA
+  allowed_regions:
+    - region-a
+    - region-b
+  allowed_data_zones:
+    - ca-zone-1
+    - ca-zone-2
+  allowed_operator_control:
+    - local
+    - partner
+  require_declared_location: true
+
+latency_targets:
+  end_to_end_p95_ms: 1200
+  time_to_first_token_p95_ms: 500
+  inter_token_latency_p95_ms: 75
+
+throughput_targets:
+  min_requests_per_second: 0.1
+  min_output_tokens_per_second: 1
+
+reliability_targets:
+  max_error_rate_pct: 1.0
+  max_timeout_rate_pct: 1.0
+
+economics:
+  currency: CAD
+  prefer_lower_cost_when_within_latency_margin_pct: 10
+  max_estimated_cost_per_1k_requests: null
+  max_estimated_cost_per_1m_output_tokens: null
+
+recommendation:
+  objective: balanced
+  weights:
+    latency: 40
+    throughput: 20
+    economics: 20
+    data_location: 20

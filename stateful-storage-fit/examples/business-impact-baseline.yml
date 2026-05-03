@@ -1,0 +1,4 @@
+baseline_assessment_minutes_per_case: 60
+baseline_source: local_process_owner
+confidence: LOW
+notes: Synthetic baseline for testing operational-minute summaries only; not a pricing model.

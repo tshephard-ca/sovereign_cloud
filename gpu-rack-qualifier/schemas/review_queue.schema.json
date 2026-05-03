@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gpu-rack-qualifier/review_queue.schema.json",
+  "title": "gpu-rack-qualifier review queue CSV row",
+  "type": "object",
+  "required": [
+    "priority",
+    "node_name",
+    "readiness_lane",
+    "recommended_state",
+    "primary_reason",
+    "operator_action",
+    "business_risk",
+    "confidence",
+    "blocking_evidence",
+    "next_question",
+    "source_evidence"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "priority": {"enum": ["P0", "P1", "P2"]},
+    "node_name": {"type": "string"},
+    "readiness_lane": {
+      "enum": [
+        "MULTINODE_READY",
+        "SINGLE_NODE_READY",
+        "INFERENCE_ONLY",
+        "AVOID_MULTINODE",
+        "REVIEW_REQUIRED",
+        "QUARANTINE_REVIEW"
+      ]
+    },
+    "recommended_state": {"type": "string"},
+    "primary_reason": {"type": "string"},
+    "operator_action": {"type": "string"},
+    "business_risk": {"type": "string"},
+    "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+    "blocking_evidence": {"type": "string"},
+    "next_question": {"type": "string"},
+    "source_evidence": {"type": "string"}
+  }
+}

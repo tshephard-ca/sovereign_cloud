@@ -1,0 +1,254 @@
+# cabinet-burst-envelope Demo
+
+Generated: 2026-05-03
+
+Target repository: `cabinet-burst-envelope`
+
+This demo explains the cleaned product story after the review-lane enhancement. It is a business and technical demo brief, not a facility approval, capacity reservation, engineering signoff, quote, pricing model, live monitor, control system, or operational command.
+
+## Executive Thesis
+
+`cabinet-burst-envelope` is best positioned as a local-only cabinet review-lane engine for high-density and bursty workload conversations.
+
+The business problem is not "calculate a kW number." The business problem is that cabinet expansion conversations often start before the cabinet-level power, thermal, feed, and evidence-quality story is clear.
+
+The tool turns ordinary local evidence into one of four review lanes:
+
+- `READY_FOR_FACILITY_REVIEW`
+- `NEEDS_REMEDIATION`
+- `STOP_EXPANSION_DISCUSSION`
+- `COLLECT_EVIDENCE`
+
+The value is reducing unsafe or wasteful capacity conversations before they consume facility engineering, operations, sales engineering, and customer-facing time.
+
+## Golden Path
+
+Run one case:
+
+```bash
+cabinet-burst-envelope assess \
+  --case-dir examples/cabinet_a01 \
+  --output-dir out/cabinet_a01 \
+  --now 2026-01-01T00:00:00Z
+```
+
+The packet contains:
+
+- `decision.json`
+- `action_queue.json`
+- `cabinet_review_packet.md`
+- `envelope.json`
+- `summary.json`
+- `aligned_timeseries.csv`
+- `facility_review_worksheet.md`
+- `manifest.json`
+- `input_fingerprints.json`
+
+The first file a business user should read is `decision.json`. The first file a human reviewer should read is `cabinet_review_packet.md`.
+
+## What The Tool Answers
+
+The tool answers:
+
+> Which review lane is this cabinet in, why, and what evidence or remediation is needed before the next conversation?
+
+It does not answer:
+
+- Is the cabinet approved?
+- Is capacity reserved?
+- Can this be quoted?
+- Can a customer be promised this capacity?
+- Should facility equipment settings be changed?
+- Is this a complete capacity plan?
+
+## Four Canonical Demo Cases
+
+### A01: Ready For Facility Review
+
+Input:
+
+- seven days of normalized PDU power data
+- top, middle, and bottom inlet-temperature telemetry
+- complete cabinet profile
+- usable sustained, burst, trip-risk, and thermal limits
+- strong evidence quality
+
+Expected review lane:
+
+```text
+READY_FOR_FACILITY_REVIEW
+```
+
+Business meaning:
+
+The cabinet can move into human facility review with bounded, review-only discussion numbers. This is the clean sales-engineering handoff case.
+
+What not to say:
+
+- "approved"
+- "reserved"
+- "safe to sell"
+- "customer-ready"
+
+### B02: Thermal Hotspot
+
+Input:
+
+- power evidence that might look acceptable by itself
+- top-inlet hot spot evidence
+- thermal model and inlet-temperature warnings that change the conversation
+
+Expected review lane:
+
+```text
+STOP_EXPANSION_DISCUSSION
+```
+
+Business meaning:
+
+The tool prevents a power-only headroom story from becoming an unsafe expansion conversation. The next action belongs to facility engineering and operations: inspect airflow, cabling, containment, neighboring exhaust, or sensor placement; then rerun the packet after remediation.
+
+### C03: Electrical And Feed Blocker
+
+Input:
+
+- current sustained or burst load above conservative electrical guardrail
+- feed imbalance or redundancy risk
+- thermal evidence that is not the main limiter
+
+Expected review lane:
+
+```text
+STOP_EXPANSION_DISCUSSION
+```
+
+Business meaning:
+
+The cabinet should not absorb additional bursty load conversation time until the electrical/feed blocker is resolved. This case protects the organization from presenting average cabinet headroom while ignoring trip-risk or feed-level constraints.
+
+### D04: Collect Evidence
+
+Input:
+
+- missing top inlet sensor
+- incomplete burst or trip-risk profile details
+- weak thermal model because the observed window lacks useful variation
+
+Expected review lane:
+
+```text
+COLLECT_EVIDENCE
+```
+
+Business meaning:
+
+The right business action is not deeper debate. The right action is evidence collection. This case keeps facility review time from being spent on a packet that cannot yet support a clear conversation.
+
+## Product Architecture
+
+The cleaned architecture has one explicit flow:
+
+```text
+case directory
+  -> validation
+  -> time alignment
+  -> power and inlet-temperature statistics
+  -> electrical and thermal envelopes
+  -> cabinet envelope
+  -> review lane
+  -> action queue
+  -> assessment packet
+```
+
+The key modules are:
+
+- `analysis.py`: explicit single-cabinet pipeline.
+- `decision.py`: review-lane classification.
+- `remediation.py`: reason-code to action-queue mapping.
+- `packet.py`: complete packet writer.
+- `report.py`: decision-card and evidence rendering.
+
+## Output Story
+
+### `decision.json`
+
+This is the primary business artifact. It contains:
+
+- review lane
+- business action
+- decision owner
+- primary constraint
+- evidence gate
+- reason codes
+- blocker and warning context
+- decision trace
+
+### `action_queue.json`
+
+This is the operational handoff. It converts reason codes into deterministic owner/action/evidence items.
+
+Example action categories:
+
+- restore inlet sensor coverage
+- confirm site-supplied cabinet limits
+- review electrical guardrail and current load
+- review feed balance and redundancy assumptions
+- remediate thermal constraint
+- repair telemetry quality
+
+### `cabinet_review_packet.md`
+
+This is the human packet. It starts with a decision card, then gives the envelope, observed evidence, reason codes, warnings, blockers, questions, and caveats.
+
+## Portfolio Story
+
+Batch mode turns many cabinet cases into a review queue:
+
+- how many cabinets are ready for facility review
+- how many need remediation
+- how many should stop expansion discussion
+- how many need evidence collection
+- which owners have the next actions
+- which constraints are most common
+
+This remains preflight triage. It is not capacity planning, pricing, quoting, or approval.
+
+## Business Impact Metrics
+
+The product can support practical workflow metrics:
+
+- ready-for-review cabinet count
+- stop-expansion cabinet count
+- collect-evidence cabinet count
+- top remediation categories
+- facility review minutes from optional pilot outcomes
+- outcome alignment when anonymized facility outcomes are supplied
+- synthetic scenario coverage for release confidence
+
+It should not estimate revenue, cost savings, or facility capacity without real pilot outcomes.
+
+## Demo Script
+
+1. Run `assess` for `examples/cabinet_a01`.
+2. Open `decision.json` and show `READY_FOR_FACILITY_REVIEW`.
+3. Open `cabinet_review_packet.md` and show the decision card.
+4. Run `assess` for `examples/cabinet_b02_hotspot`.
+5. Show that thermal evidence changes the lane.
+6. Run `assess` for `examples/cabinet_c03_power_limited`.
+7. Show electrical/feed blockers and action ownership.
+8. Run `assess` for `examples/cabinet_d04_low_confidence`.
+9. Show evidence collection as the correct business outcome.
+10. Run `batch` across `examples/` to show the portfolio review queue.
+
+## Success Criteria
+
+A user should understand within one minute:
+
+- what the input contract is
+- which review lane the cabinet is in
+- why the tool chose that lane
+- what action comes next
+- who owns the action
+- what claims the packet refuses to make
+
+That is the compelling product shape: local evidence becomes a clean business workflow without crossing into approval, reservation, quoting, pricing, live monitoring, control, or facility automation.

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpu-rack-qualifier"
+version = "0.1.0"
+description = "Convert GPU qualification evidence into review-only Slurm labels and quarantine recommendations."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+authors = [{name = "gpu-rack-qualifier contributors"}]
+dependencies = [
+  "pydantic>=1.10",
+  "pyyaml>=6.0",
+  "typer>=0.9",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[project.scripts]
+gpu-rack-qualifier = "gpu_rack_qualifier.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Prompt Egress Guard",
+  "version": "0.1.0",
+  "description": "Local prompt-risk guard for configured public AI sites.",
+  "permissions": ["storage", "declarativeNetRequest"],
+  "host_permissions": [],
+  "background": {
+    "service_worker": "service_worker.js",
+    "type": "module"
+  },
+  "content_scripts": [],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "policy_rules",
+        "enabled": true,
+        "path": "dnr_rules.json"
+      }
+    ]
+  }
+}

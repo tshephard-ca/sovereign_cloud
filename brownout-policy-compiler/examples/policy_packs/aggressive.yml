@@ -1,0 +1,56 @@
+pack_id: aggressive
+description: Short TTL review pack with stronger low-priority degradation preferences.
+
+ttl:
+  default_minutes: 15
+  p0_max_minutes: 15
+  p1_max_minutes: 15
+  p2_max_minutes: 10
+  p3_max_minutes: 10
+  p4_max_minutes: 10
+  null_route_max_minutes: 5
+
+rate_limit_profiles:
+  protect_critical_udp:
+    description: Stricter untrusted UDP limit for critical services.
+    abstract_rate: low
+    applies_to:
+      - udp
+  public_web_low_priority:
+    description: Strong reduction for low-priority public web traffic.
+    abstract_rate: low
+    applies_to:
+      - tcp
+
+action_preferences:
+  P0:
+    - ALLOW_TRUSTED_SOURCES
+    - PRIORITIZE
+    - RATE_LIMIT_UNTRUSTED
+  P1:
+    - ALLOW_TRUSTED_SOURCES
+    - PRIORITIZE
+    - RATE_LIMIT_UNTRUSTED
+  P2:
+    - RATE_LIMIT
+    - DEPRIORITIZE
+  P3:
+    - SHED_LOW_PRIORITY
+    - RATE_LIMIT
+  P4:
+    - SHED_LOW_PRIORITY
+    - RATE_LIMIT
+
+risk_defaults:
+  TEMPORARY_NULL_ROUTE: CRITICAL
+  DENY_UNTRUSTED: HIGH
+  TEMPORARY_BLOCK_PORT: HIGH
+  RATE_LIMIT_UNTRUSTED: MEDIUM
+  RATE_LIMIT: MEDIUM
+  SHED_LOW_PRIORITY: HIGH
+  PRIORITIZE: LOW
+  ALLOW_TRUSTED_SOURCES: LOW
+  DEPRIORITIZE: MEDIUM
+  CHALLENGE: MEDIUM
+  MONITOR_ONLY: LOW
+

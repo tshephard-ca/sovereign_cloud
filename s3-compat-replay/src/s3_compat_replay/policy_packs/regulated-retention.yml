@@ -1,0 +1,20 @@
+schema_version: 1
+name: regulated-retention
+description: Retention-focused buckets where Object Lock and version behavior need explicit human validation.
+workload_type: regulated_retention
+required_families:
+  - object_write
+  - object_read
+  - versioning
+severity_overrides:
+  OBJECT_LOCK_UNSUPPORTED: BLOCKER
+  OBJECT_LOCK_RETENTION_MISMATCH: BLOCKER
+  OBJECT_LOCK_LEGAL_HOLD_MISMATCH: BLOCKER
+  VERSIONING_TARGET_NOT_ENABLED: BLOCKER
+required_hints:
+  - object_lock
+  - versioning
+evidence_quality_minimum: HIGH
+human_questions:
+  - Which retention modes and legal hold flows are required?
+  - Is versionId behavior part of application logic?

@@ -1,0 +1,1044 @@
+# estate-triage demo analysis
+
+Analysis date: 2026-05-02
+Repository reviewed: estate-triage
+
+## Executive thesis
+
+estate-triage is most compelling when positioned as a deterministic evidence-to-decision engine for pre-sales infrastructure triage. Its value is not that it generates a report. Its value is that it converts messy but ordinary infrastructure, backup, and utilization exports into governed, explainable, privacy-safe work queues that a partner, sales engineer, delivery lead, and customer operations team can use before committing to a deeper assessment.
+
+The core business impact is funnel quality. The tool improves which workloads are discussed first, which data gaps are requested first, which risky records are withheld from customer-facing recommendations, and which motions are pursued with the strongest evidence. That is defensible because the repo has moved beyond a simple CSV scorer into a repeatable operating system for assessment qualification:
+
+- explicit schema contracts
+- deterministic identity resolution
+- evidence provenance and traceability
+- versioned feature and policy engines
+- data readiness validation
+- privacy-preserving bundles
+- ranking modes that expose different commercial motions
+- workflow packs that turn findings into action queues
+- synthetic real-world data generation for regression, partner training, and coverage testing
+- feedback and outcome structures for measuring downstream accuracy and conversion
+
+The strongest commercial wedge is this:
+
+A partner or sales team can ask for ordinary exports, run them locally with no credentials and no external calls, and return within hours with a credible first review queue, a missing-evidence request list, and a defensible explanation for every workload shown or withheld.
+
+That is materially different from a static report generator. It is a repeatable qualification layer that can sit before assessment, migration review, archive review, DR review, and allocation right-sizing review.
+
+## External context used
+
+The business stories below were grounded against public operating guidance and market context, not vendor-specific claims.
+
+1. NIST Cybersecurity Framework 2.0
+   - URL: https://www.nist.gov/publications/nist-cybersecurity-framework-csf-20
+   - Why it matters: NIST CSF 2.0 frames cybersecurity risk management as an outcome-oriented discipline that needs clear communication across stakeholders. estate-triage aligns with that pattern by turning infrastructure evidence into explainable outcomes, gaps, and work queues instead of opaque recommendations.
+
+2. NIST SP 800-34 Rev. 1, Contingency Planning Guide for Federal Information Systems
+   - URL: https://csrc.nist.gov/pubs/sp/800/34/r1/final
+   - Why it matters: contingency planning depends on reliable recovery requirements, backup awareness, impact analysis, and recoverability assumptions. estate-triage does not verify backups, but it makes backup metadata visible enough to prioritize DR tier review and follow-up.
+
+3. FinOps Foundation, Usage Optimization capability
+   - URL: https://www.finops.org/framework/capabilities/usage-optimization/
+   - Why it matters: usage optimization distinguishes between consumption signals and optimization action. estate-triage follows that discipline by separating allocation-only right-sizing from utilization-backed right-sizing and never claiming a dollar saving.
+
+4. Uptime Institute, Annual Outage Analysis 2025
+   - URL: https://intelligence.uptimeinstitute.com/index.php/resource/annual-outage-analysis-2025
+   - Why it matters: outage preparation and recovery posture remain high-impact executive concerns. estate-triage supports this with a DR tier review queue based on backup recency, restore point count, backup footprint, RPO, and change profile.
+
+5. NIST SP 800-53 Rev. 5
+   - URL: https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final
+   - Why it matters: evidence quality, control traceability, and auditability matter when infrastructure assessment findings are used in regulated or security-sensitive environments. estate-triage keeps local evidence, schema versions, and trace data rather than relying on unverifiable narrative claims.
+
+## What was reviewed locally
+
+Code areas reviewed:
+
+- CLI and API entry points: `src/estate_triage/cli.py`, `src/estate_triage/api.py`, `src/estate_triage/workflow.py`
+- column mapping and adapters: `src/estate_triage/columns.py`, `src/estate_triage/adapters.py`, `src/estate_triage/normalize.py`
+- identity and matching: `src/estate_triage/identity.py`, `src/estate_triage/matching.py`
+- feature layer: `src/estate_triage/features.py`, `src/estate_triage/feature_engine.py`
+- scoring and policy: `src/estate_triage/rules.py`, `src/estate_triage/scoring.py`, `src/estate_triage/policy.py`
+- assessment and reporting: `src/estate_triage/assessment.py`, `src/estate_triage/report.py`, `src/estate_triage/bundle.py`
+- validation and data quality: `src/estate_triage/validation.py`
+- generated data system: `src/estate_triage/real_world_generator.py`
+- docs: `README.md`, `docs/architecture.md`, `docs/real_world_data.md`, `docs/generated_data_validation.md`, `docs/real_world_generator_audit.md`, `docs/gap_closure_status.md`
+
+Local validation performed:
+
+- Test suite: `72 passed`
+- Example analysis completed with 35 inventory rows, 35 backup rows, 4 utilization rows, and 25 output rows.
+- Generated real-world coverage profile completed with 109 inventory rows, 107 backup rows, and 38 utilization rows.
+- Generated edge-case fixture pack completed and included malformed, duplicate-header, mixed-unit, localized, embedded-delimiter, irregular-line-ending, extra-column, missing-column, and non-UTF-8 examples.
+- Generated bundle analysis completed in balanced, global, and per-motion ranking modes.
+- Workflow pack generation completed and produced executive summary, discovery plan, work queues, evidence packets, ranking comparison, and task CSV.
+
+## Generated input deep dive
+
+### Example inputs
+
+The example input set is intentionally simple enough for first-time users:
+
+- 35 synthetic inventory workloads
+- 35 normalized backup metadata rows
+- 4 optional utilization rows
+
+The inventory CSV includes practical columns that a pre-sales team can often obtain:
+
+- workload name
+- UUID
+- power state
+- CPU count
+- memory MiB
+- provisioned storage
+- in-use storage
+- OS
+- snapshot total
+- optional CPU and memory usage percent
+- tags and notes
+
+The backup CSV is deliberately normalized rather than tool-specific:
+
+- workload name or UUID
+- backup size
+- latest restore point
+- restore point count
+- average daily change
+- policy and job metadata
+- retention
+- immutability date
+- RPO and RTO hints
+- repository and protection status
+- last success and failure timestamps
+
+This is commercially important because it lowers the barrier to first value. A customer or partner does not need to grant API access, install an agent, expose credentials, or buy a connector before a useful conversation can begin.
+
+### Generated real-world coverage profile
+
+The generated coverage dataset is much more important than the small examples. It creates a broad test corpus that exercises business scenarios and failure modes:
+
+- 109 inventory rows
+- 107 backup rows
+- 38 utilization rows
+- 5 intentionally unmatched backup-only rows
+- 24 easy migration review candidates
+- 12 large low-change DR review candidates
+- 12 powered-off stale archive review candidates
+- 10 utilization-backed right-sizing candidates
+- 8 allocation-only right-sizing candidates
+- 6 snapshot-blocked candidates
+- 5 inventory rows without backup matches
+- 5 name-only matches
+- 4 missing-storage-used records
+- 3 UUID/name conflict cases
+- 3 duplicate-name candidate cases
+- 2 ambiguous backup date cases
+- 4 contradictory records
+- 4 sparse minimal records
+- 4 rich-context records
+- 3 extreme outlier records
+
+This coverage is realistic because real assessment exports are rarely clean. The generated input simulates records that a sales engineer must be able to explain, withhold, or route for more evidence:
+
+- duplicate names
+- UUID conflicts
+- missing in-use storage
+- stale or ambiguous backup dates
+- contradictory capacity values
+- out-of-range utilization percentages
+- sparse rows that should not be over-interpreted
+- snapshot blockers
+- backup-only records that may indicate retired, renamed, or out-of-scope systems
+
+The generated data also supports business validation because it contains known expected motions. That lets the repo test whether migration, archive, right-sizing, and DR tier stories all appear in outputs, instead of relying on a hand-picked happy path.
+
+### Edge-case fixture pack
+
+The edge-case generator creates:
+
+- duplicate headers
+- embedded commas and newlines
+- mixed storage units
+- localized headers and power states
+- irregular line endings
+- extra columns
+- missing columns
+- malformed quoting
+- non-UTF-8 input
+
+This matters commercially because pre-sales exports often arrive from spreadsheets, scripts, regional tools, or manually edited files. A triage product that only works on perfect CSV files becomes a demo artifact. A triage product that tells the user what is wrong, what was recognized, and what needs correction becomes operational technology.
+
+## Code deep dive
+
+### Deterministic local execution
+
+The CLI does not require credentials, does not call external services, and does not invoke proprietary tools. That keeps the assessment motion low-friction and privacy-aligned. In practical terms, a partner can run it inside a customer-controlled environment or on redacted exports.
+
+The command surface supports:
+
+- direct CSV analysis
+- bundle analysis
+- validation
+- generator profile validation
+- real-world data generation
+- workflow pack generation
+- summary JSON
+- assessment JSON
+- redaction
+- strict mode
+- ranking modes
+
+The API layer also matters because it makes the engine embeddable. A repository that only exposes a CLI is a useful utility. A repository that also exposes stable functions and structured artifacts can become core technology inside portals, assessment factories, partner tooling, or internal delivery systems.
+
+### Adapter boundary
+
+The adapter layer has a clear responsibility boundary:
+
+- parse input files
+- map columns
+- normalize fields
+- attach source provenance
+- record data quality findings
+
+It does not:
+
+- score workloads
+- assign commercial motions
+- hide identity conflicts
+- call external systems
+- change policy semantics
+
+That separation is defensible. It means future adapters can support more export shapes without changing how scores are produced. It also means partners can contribute mappers while the core policy and evidence contracts remain stable.
+
+### Identity resolution
+
+Identity is one of the highest-value parts of the repo. The code prefers UUID-level matches, falls back to normalized names, and exposes conflicts rather than pretending ambiguous records are safe.
+
+Identity states include:
+
+- RESOLVED
+- PROBABLE
+- CONFLICTED
+- DUPLICATE_CANDIDATES
+- UNMATCHED
+
+The generated run found:
+
+- 88 UUID matches
+- 8 name matches
+- 13 unmatched inventory rows
+- 3 conflicted records
+- 3 duplicate candidate groups
+
+This directly supports business credibility. In real assessments, a wrong join can create a false recommendation, embarrass the partner, and damage trust. estate-triage protects against that by making identity uncertainty first-class evidence.
+
+### Feature registry
+
+The feature layer converts raw fields into explicit, testable signals:
+
+- workload key
+- backup-to-used ratio
+- change rate percent
+- recent backup
+- stale backup
+- powered on/off
+- high allocated CPU
+- high allocated memory
+- large backup footprint
+- low change rate
+- storage ratios
+- snapshot risk
+- utilization-backed CPU and memory signals
+- stale inventory
+- RPO and restore point signals
+- data quality risk
+
+The business value is in the honesty of these features. Allocation is not treated as utilization. Backup size is not treated as business criticality. Powered off is not treated as unused. Low change rate is not treated as a retirement recommendation. That distinction makes the outputs credible for technical buyers.
+
+### Policy engine
+
+The policy pack is versioned and deterministic. The default pack uses simple, explainable rules for:
+
+- MIGRATION_REVIEW
+- ARCHIVE_REVIEW
+- RIGHTSIZING_REVIEW
+- DR_TIER_REVIEW
+
+The policy engine is commercially important because it can become the governed decision layer. A partner organization can standardize thresholds, approval metadata, motion labels, blocking flags, and required evidence. That turns tribal sales-engineering judgment into a repeatable process while still preserving human review.
+
+### Data readiness validation
+
+The validation layer reads files before analysis and reports:
+
+- readiness score
+- readiness grade
+- recognized rows
+- recognized fields
+- missing recommended fields
+- field profiles
+- parse warnings
+- mapping confidence
+- matchability forecast
+- data request checklist
+
+In the generated run:
+
+- utilization input achieved readiness grade A with no findings
+- inventory input intentionally produced readiness grade F because it contained contradictory and out-of-range records
+- backup input produced readiness grade F because of ambiguous dates and missing/blank mapped fields
+
+That is not a failure of the generator. It is exactly the point. The tool can distinguish usable evidence from evidence that must be corrected before a customer-facing recommendation is made.
+
+### Ranking modes
+
+The repo supports multiple ranking modes:
+
+- balanced
+- global
+- per_motion
+- confidence_first
+- blockers_first
+- missing_evidence_first
+
+The generated run showed why this matters. In a global top-50 ranking, migration dominated and archive/right-sizing were buried. In balanced mode, the top 50 contained roughly equal representation across the four motions:
+
+- 13 migration
+- 12 archive
+- 13 right-sizing
+- 12 DR
+
+This is a real commercial insight. Different teams need different lists:
+
+- a migration team wants the strongest migration candidates
+- a DR specialist wants backup and recovery tier candidates
+- a capacity or FinOps team wants right-sizing candidates
+- a customer success or account team may want archive review candidates
+- an executive sponsor wants a balanced portfolio of next actions
+
+Ranking mode is therefore not a UI preference. It is a sales-motion control.
+
+### Workflow pack
+
+The workflow pack moves the repo beyond "report generation." It creates:
+
+- executive summary
+- discovery plan
+- work queues
+- evidence packets
+- task CSV
+- ranking comparison
+
+The generated workflow pack produced:
+
+- 109 evidence packets
+- migration: 32 strong candidates, 10 needs-more-data, 11 review candidates, 11 do-not-present
+- archive: 12 needs-more-data
+- right-sizing: 10 strong candidates, 8 do-not-present
+- DR: 12 strong candidates, 3 needs-more-data
+
+This is a major business-value feature. It tells the partner which records are ready to present, which require follow-up, and which should not be shown to the customer yet.
+
+### Privacy and handoff
+
+The repo supports redaction, fingerprints, bundle manifests, and local-only processing. Redaction replaces workload names and hashes workload keys while preserving numeric metrics and reason codes.
+
+That enables privacy-safe collaboration:
+
+- a customer can share redacted output with a partner
+- a partner can escalate an evidence packet internally without exposing workload names
+- a delivery team can compare fingerprints to detect whether inputs changed
+- a governance reviewer can understand what policy version and thresholds were used
+
+Privacy is not just a compliance story here. It is a sales-cycle accelerator because it makes the first data-sharing step easier.
+
+### Feedback and outcome structure
+
+The repo includes feedback/outcome mechanisms with labels such as accepted, rejected, duplicate, wrong motion, missed opportunity, and needs more data. The sample feedback is small, but the mechanism matters.
+
+This is how estate-triage can become better business technology over time without becoming an AI system:
+
+- track accepted recommendations
+- track rejected recommendations
+- track false positives and false negatives
+- track which blockers most often delay customer action
+- track which missing fields are most often requested
+- track motion conversion after deeper assessment
+- compare policy versions against outcomes
+
+That is the path from deterministic tool to operational learning system.
+
+## Generated output deep dive
+
+### Example output
+
+The example run produced 25 ranked rows. Representative rows:
+
+- `app-001`: MIGRATION_REVIEW, score 95, high confidence, UUID matched, recent backup, low change rate, small storage footprint.
+- `report-001`: ARCHIVE_REVIEW, score 80, high confidence, powered off, stale backup, unknown OS, flagged as not a migration candidate.
+- `dr-large-001`: DR_TIER_REVIEW, score 90, high confidence, low change rate, large backup footprint, high backup-to-used ratio, many restore points.
+- `rightsizing-util-001`: utilization-backed right-sizing signals exist, but the balanced example showed that migration can still win if the migration score is higher.
+
+That last point is important. The tool does not force a workload into a desired story. It scores multiple motions and chooses the highest, while other evidence remains available in assessment artifacts.
+
+### Generated balanced output
+
+The generated balanced top-50 output contained:
+
+- 13 migration review rows
+- 12 archive review rows
+- 13 right-sizing review rows
+- 12 DR tier review rows
+
+This demonstrates full-motion coverage. It also shows why balanced ranking is commercially useful for a partner demo: it prevents one motion from crowding out all others.
+
+### Generated global output
+
+The generated global top-50 output contained:
+
+- 39 migration review rows
+- 11 DR tier review rows
+- 0 archive review rows
+- 0 right-sizing review rows
+
+This is not necessarily wrong. It means migration scores dominated under global ranking. But it is a gap for customer discovery because important archive and right-sizing stories would not be surfaced to the right personas unless ranking mode is selected intentionally.
+
+### Generated assessment statistics
+
+Across all 109 generated workloads:
+
+- 64 primary migration review
+- 12 primary archive review
+- 18 primary right-sizing review
+- 15 primary DR tier review
+- 75 high confidence
+- 5 medium confidence
+- 29 low confidence
+
+Identity states:
+
+- 85 resolved
+- 5 probable
+- 13 unmatched
+- 3 conflicted
+- 3 duplicate candidates
+
+Top blocking flags:
+
+- MISSING_CHANGE_RATE: 21
+- NO_BACKUP_MATCH: 13
+- MISSING_BACKUP_SIZE: 13
+- POWERED_OFF_NOT_MIGRATION_CANDIDATE: 12
+- SNAPSHOT_PRESENT: 9
+- LOW_CONFIDENCE_RIGHTSIZING: 8
+- NAME_MATCH_ONLY: 8
+- MISSING_STORAGE_USED: 8
+- CONFLICTED: 3
+- DUPLICATE_CANDIDATES: 3
+
+Top data quality findings:
+
+- UNMATCHED_INVENTORY: 13
+- PERCENT_OUT_OF_RANGE: 8
+- IN_USE_EXCEEDS_PROVISIONED: 7
+- DUPLICATE_BACKUP_NAME: 3
+- UUID_NAME_CONFLICT: 3
+- DUPLICATE_NAME_CANDIDATES: 3
+- PARSE_WARNING: 2
+- UNMATCHED_BACKUP_ROWS: 1
+- UNMATCHED_BACKUP_LIKELY_DECOMMISSIONED: 1
+
+This output is realistic because the most valuable business conversation is often not "here are 25 recommendations." It is:
+
+- here are the strong candidates
+- here are the records not safe to present
+- here is what is blocking the next meeting
+- here is the exact evidence request that would improve confidence
+
+### Missing evidence output
+
+The generated missing-evidence summary identified high-priority gaps:
+
+- latest restore point date
+- CPU usage percent
+- memory usage percent
+- average daily change
+- backup total size
+- in-use storage
+- restore point count
+- OS
+- RPO hours
+- power state
+
+This is commercially valuable because it turns a vague "send us better data" conversation into a targeted request list. That can reduce back-and-forth cycles and improve the quality of the deeper assessment.
+
+## Personas
+
+1. Partner sales engineer
+   - Owns the first technical readout and needs credible, evidence-backed talking points.
+
+2. Partner delivery lead
+   - Needs to avoid sending consultants into unqualified or poorly scoped assessments.
+
+3. Customer infrastructure owner
+   - Owns virtual infrastructure exports, workload identity, power state, allocation, and storage metadata.
+
+4. Backup and DR owner
+   - Owns restore point metadata, backup footprint, retention, RPO, immutability, and recoverability context.
+
+5. Capacity planner or FinOps practitioner
+   - Owns usage optimization conversations, but needs utilization evidence before right-sizing claims are credible.
+
+6. Application owner
+   - Knows business criticality, maintenance windows, application dependencies, and whether archive discussion is appropriate.
+
+7. Security, privacy, or governance reviewer
+   - Needs local-only processing, redaction, evidence traceability, and repeatable policy behavior.
+
+8. Enterprise architect
+   - Needs a cross-motion view of migration readiness, DR posture, retirement candidates, and capacity concerns.
+
+9. Executive sponsor
+   - Needs a concise, believable view of where deeper assessment effort should focus.
+
+10. Partner operations manager
+   - Needs repeatability across accounts, consistent thresholds, quality controls, and measurable outcomes.
+
+## Top business stories
+
+### 1. The two-hour qualified migration queue
+
+Personas:
+
+- Partner sales engineer
+- Customer infrastructure owner
+- Application owner
+- Executive sponsor
+
+Story:
+
+A partner receives ordinary inventory and backup exports before a discovery workshop. Instead of manually scanning spreadsheets, the partner runs estate-triage locally and produces a migration review queue. Workloads with UUID matches, recent backups, low change rates, known OS values, small storage footprints, and no snapshot blockers appear as high-confidence candidates. Records with snapshot risk, missing backup data, or identity conflicts are separated before the customer meeting.
+
+Why this has real ROI:
+
+- reduces manual spreadsheet triage
+- makes the first workshop evidence-led
+- protects the partner from presenting unsafe candidates
+- gives the application owner specific workloads to validate
+- shortens the path to a scoped deeper assessment
+
+Why it is credible:
+
+- the tool does not claim migration readiness
+- it says "migration review candidate"
+- it keeps snapshot blockers and missing data visible
+- every reason code is traceable
+
+Business impact:
+
+This story improves the top of the migration assessment funnel. The partner can focus expensive architect time on the workloads most likely to produce a useful next step.
+
+### 2. The archive review that avoids the "unused VM" trap
+
+Personas:
+
+- Partner sales engineer
+- Customer infrastructure owner
+- Application owner
+- Backup and DR owner
+- Executive sponsor
+
+Story:
+
+The generated data produced 12 powered-off stale archive review candidates. The tool does not say those systems are unused. It says they are archive review candidates and flags that powered-off systems are not migration candidates. For each row, the application owner can confirm whether it is retired, seasonal, retained for audit, or awaiting decommission.
+
+Why this has real ROI:
+
+- identifies low-friction cleanup conversations
+- avoids the credibility risk of calling a powered-off system unused
+- reduces scope inflation before migration planning
+- creates a customer-approved archive discussion list
+- may reduce backup, storage, and operational clutter after human approval
+
+Why it is credible:
+
+- powered off is treated as a signal, not proof
+- stale backup is treated as a review trigger, not a recommendation
+- unknown OS is treated as a confidence issue
+- archive candidates are routed as needs-more-data when confidence is insufficient
+
+Business impact:
+
+This story helps prevent unnecessary assessment and migration effort on systems that may not belong in the future-state estate.
+
+### 3. The right-sizing conversation that separates allocation from utilization
+
+Personas:
+
+- Capacity planner or FinOps practitioner
+- Customer infrastructure owner
+- Partner sales engineer
+- Application owner
+- Governance reviewer
+
+Story:
+
+The tool identifies high allocated CPU and memory, but it only uses stronger right-sizing language when utilization evidence exists. In the generated run, 10 utilization-backed right-sizing candidates were strong candidates, while 8 allocation-only candidates were classified as do-not-present or low-confidence right-sizing.
+
+Why this has real ROI:
+
+- prevents sales teams from making unsupported savings claims
+- gives the capacity planner a defensible first review list
+- identifies where utilization exports are needed
+- converts a generic optimization pitch into an evidence request
+- improves trust with technical stakeholders
+
+Why it is credible:
+
+- allocation-only signals use softer reason codes
+- utilization-backed signals use IDLE_CPU and OVERSIZED_MEMORY
+- confidence is constrained when utilization is absent
+- no pricing estimate is produced
+
+Business impact:
+
+This story can open cost and capacity conversations without turning the tool into a pricing engine or overpromising savings.
+
+### 4. The DR tier review driven by backup shape, not business criticality guesses
+
+Personas:
+
+- Backup and DR owner
+- Enterprise architect
+- Partner sales engineer
+- Application owner
+- Executive sponsor
+
+Story:
+
+The generated data produced 12 large low-change DR tier review candidates. These workloads have large backup footprints, low change rates, high backup-to-used ratios, many restore points, or recent backup patterns that justify a DR tier review discussion. The tool does not recommend a lower tier as fact. It points the DR owner and application owner to workloads where the backup profile deserves examination.
+
+Why this has real ROI:
+
+- focuses DR review on high-footprint workloads
+- creates a concrete agenda for backup policy review
+- separates technical backup shape from business criticality
+- gives the executive sponsor a resilience-oriented story
+- supports contingency planning conversations without claiming backup success
+
+Why it is credible:
+
+- no backup verification is claimed
+- no business criticality is invented
+- RPO, restore point count, backup size, and change rate are visible
+- missing backup data becomes a blocker
+
+Business impact:
+
+This story helps organizations spend DR review time where the backup footprint and change profile suggest the biggest policy questions.
+
+### 5. The missing-evidence request that shortens the sales cycle
+
+Personas:
+
+- Partner delivery lead
+- Customer infrastructure owner
+- Backup and DR owner
+- Capacity planner
+- Partner operations manager
+
+Story:
+
+After validation, estate-triage creates a prioritized missing-evidence list. Instead of asking the customer to resend "better data," the partner asks for specific fields: latest restore point date, CPU usage percent, memory usage percent, average daily change, backup size, in-use storage, restore point count, OS, RPO, and power state.
+
+Why this has real ROI:
+
+- reduces email churn
+- improves the second data drop
+- makes discovery more operationally precise
+- helps each persona supply only the fields they own
+- reduces consultant time spent cleaning inputs
+
+Why it is credible:
+
+- missing evidence is derived from the policy and feature gaps
+- high-priority fields are tied to confidence improvements
+- readiness scoring shows whether the data is fit for customer presentation
+
+Business impact:
+
+This story turns data collection from an unstructured pre-sales delay into a repeatable intake process.
+
+### 6. The do-not-present queue that protects trust
+
+Personas:
+
+- Partner sales engineer
+- Partner delivery lead
+- Governance reviewer
+- Customer infrastructure owner
+
+Story:
+
+The workflow pack does not only generate candidates. It also creates do-not-present queues for identity conflicts, duplicate candidates, low-confidence right-sizing, and unsafe records. In the generated workflow pack, migration had 11 do-not-present records and right-sizing had 8.
+
+Why this has real ROI:
+
+- avoids embarrassing false positives
+- protects the partner's technical credibility
+- prevents conflicted records from reaching executive slides
+- gives operations teams a cleanup queue before the next workshop
+
+Why it is credible:
+
+- identity conflicts are first-class states
+- duplicate candidates are not silently resolved
+- blocking flags are separate from positive reason codes
+- low-confidence right-sizing is not promoted as a savings story
+
+Business impact:
+
+This story reduces sales risk. Avoiding one bad recommendation in a technical workshop can preserve the credibility needed for the larger opportunity.
+
+### 7. The ranking-mode story that aligns different buyer agendas
+
+Personas:
+
+- Executive sponsor
+- Enterprise architect
+- Partner sales engineer
+- Backup and DR owner
+- Capacity planner
+
+Story:
+
+The same generated dataset tells different stories depending on ranking mode. Global ranking surfaced mostly migration and DR. Balanced ranking surfaced all four motions. Per-motion ranking produced a controlled top list for each motion.
+
+Why this has real ROI:
+
+- one dataset can support multiple buyer conversations
+- executive readout can remain balanced
+- specialist teams can receive focused queues
+- sales engineering can avoid over-indexing on the highest raw scores
+- partner teams can package findings by motion
+
+Why it is credible:
+
+- ranking mode is explicit
+- summary JSON records the selected ranking mode
+- reason codes and scores remain deterministic
+- no hidden prioritization is applied
+
+Business impact:
+
+This story turns estate-triage into a portfolio triage layer rather than a single-score report.
+
+### 8. The privacy-safe handoff for partner ecosystems
+
+Personas:
+
+- Security, privacy, or governance reviewer
+- Partner operations manager
+- Partner delivery lead
+- Executive sponsor
+
+Story:
+
+A customer can run estate-triage locally or provide redacted outputs. Workload names are replaced, workload keys are hashed, numeric evidence remains intact, and reason codes are preserved. Bundles include manifests, fingerprints, policy metadata, and output artifacts.
+
+Why this has real ROI:
+
+- lowers the barrier to sharing assessment evidence
+- supports internal escalation without exposing workload names
+- improves repeatability across partner teams
+- preserves enough technical detail for review
+- makes policy and data changes detectable
+
+Why it is credible:
+
+- no telemetry
+- no external calls
+- no credentials
+- redaction keeps evidence useful while hiding names
+- fingerprints support reproducibility checks
+
+Business impact:
+
+This story can shorten legal, security, and procurement friction around early-stage infrastructure assessment.
+
+### 9. The partner assessment factory
+
+Personas:
+
+- Partner operations manager
+- Partner delivery lead
+- Partner sales engineer
+- Enterprise architect
+
+Story:
+
+A partner standardizes estate-triage as the first step in every infrastructure assessment. Each opportunity receives the same intake validation, policy pack, ranking mode, evidence packet format, and workflow pack. Delivery teams spend less time debating spreadsheet interpretation and more time validating high-value findings with the customer.
+
+Why this has real ROI:
+
+- creates repeatable assessment operations
+- improves quality control across sales engineers
+- enables onboarding and training with synthetic fixtures
+- makes policy changes versioned and reviewable
+- creates comparable outputs across accounts without exposing customer names
+
+Why it is credible:
+
+- generated data covers both positive scenarios and failure modes
+- policy packs are versioned
+- schema versions are explicit
+- validation gates poor inputs
+- workflow artifacts are deterministic
+
+Business impact:
+
+This story is the clearest path from open-source tool to core partner technology.
+
+### 10. The governed policy layer for assessment consistency
+
+Personas:
+
+- Governance reviewer
+- Enterprise architect
+- Partner operations manager
+- Partner sales engineer
+
+Story:
+
+The partner or internal assessment team defines an approved policy pack. Every triage run records the policy version, thresholds, schema versions, and reason codes. When a stakeholder asks why a workload was ranked, the answer is a traceable rule path rather than a subjective explanation.
+
+Why this has real ROI:
+
+- improves consistency across teams
+- reduces rework from inconsistent scoring
+- supports audit and governance review
+- allows controlled policy evolution
+- makes results explainable to skeptical technical buyers
+
+Why it is credible:
+
+- the policy engine is deterministic
+- rule execution order is stable
+- reason codes are explicit
+- blocking flags are separated
+- confidence is tied to data quality and match quality
+
+Business impact:
+
+This story makes estate-triage a reusable decision kernel, not a one-off script.
+
+### 11. The synthetic data laboratory for partner enablement
+
+Personas:
+
+- Partner operations manager
+- Sales engineering manager
+- Quality engineer
+- Governance reviewer
+
+Story:
+
+The generator creates realistic coverage datasets, edge-case fixtures, and expected scenario distributions. New policies, adapters, and ranking changes can be tested before being used in front of a customer. A manager can train sales engineers on realistic but synthetic data without exposing a real estate.
+
+Why this has real ROI:
+
+- enables safe training
+- protects against regressions
+- makes demos more realistic
+- improves adapter quality
+- gives teams a way to test rare but important failure modes
+
+Why it is credible:
+
+- the generator includes conflict, duplicate, sparse, contradictory, and malformed cases
+- profile validation checks expected distributions
+- edge-case fixtures test parser resilience
+- field-derived profile gates prevent synthetic data from being mistaken for field evidence
+
+Business impact:
+
+This story supports scale. A core technology needs a way to test and teach itself without waiting for customer data.
+
+### 12. The feedback loop that measures commercial usefulness
+
+Personas:
+
+- Partner operations manager
+- Partner delivery lead
+- Executive sponsor
+- Sales engineering manager
+
+Story:
+
+After customer workshops, teams record which findings were accepted, rejected, duplicated, wrong-motion, or converted into deeper work. Over time, this builds a non-ML operating dataset that shows which reason codes, confidence levels, blockers, and missing evidence patterns correlate with useful outcomes.
+
+Why this has real ROI:
+
+- measures which motions create qualified follow-up
+- identifies false-positive patterns
+- improves threshold governance
+- supports enablement and coaching
+- helps prove partner productivity gains
+
+Why it is credible:
+
+- it does not require AI or external telemetry
+- outcomes are explicit and human-recorded
+- policy versions can be compared
+- conversion can be tracked separately from scoring
+
+Business impact:
+
+This story is how estate-triage can move from deterministic triage to measurable business performance infrastructure.
+
+## ROI model without unsupported pricing claims
+
+estate-triage should not claim savings dollars directly. A credible ROI model should measure operational impact:
+
+1. Triage labor avoided
+   - baseline: hours spent manually reviewing inventory, backup, and utilization exports
+   - measured outcome: time from received exports to first qualified work queue
+
+2. Assessment quality improved
+   - baseline: percentage of discovery findings rejected due to missing evidence or wrong identity
+   - measured outcome: accepted finding rate, false positive rate, wrong-motion rate
+
+3. Data collection cycles reduced
+   - baseline: number of customer follow-up cycles required to get usable fields
+   - measured outcome: first-pass readiness grade and number of targeted missing-evidence requests
+
+4. Delivery scoping improved
+   - baseline: consultant time spent on workloads later removed from scope
+   - measured outcome: percentage of do-not-present and needs-more-data records removed before paid delivery
+
+5. Risk avoided
+   - baseline: identity conflicts, duplicate names, missing backup data, snapshot blockers, and stale evidence discovered late
+   - measured outcome: conflicts and blockers caught before customer-facing readout
+
+6. Partner scale improved
+   - baseline: inconsistent scoring across individual sales engineers
+   - measured outcome: policy-version consistency, repeatable reason-code distributions, and comparable workflow packs across opportunities
+
+High ROI is realistic when the tool is used at the front of a large assessment funnel. The value comes from directing scarce expert time toward better-qualified opportunities and avoiding low-confidence claims.
+
+## Defensibility assessment
+
+estate-triage becomes defensible through accumulated operational structure, not through secret algorithms.
+
+Most defensible elements:
+
+- evidence schema and trace contract
+- identity resolution behavior
+- adapter boundary and mapper ecosystem
+- feature registry semantics
+- versioned policy packs
+- workflow artifacts used by real teams
+- validation and readiness scoring
+- redaction and bundle fingerprinting
+- feedback and outcome history
+- generated test corpus and edge-case library
+
+Weakly defensible elements:
+
+- basic CSV parsing
+- simple threshold scoring
+- static README documentation
+- one-off output CSV generation
+
+The strategic direction should therefore emphasize contracts, governance, field-tested policies, partner workflows, and outcome measurement rather than just adding more columns or prettier reports.
+
+## Remaining credibility limits
+
+The repo is strong for a local deterministic triage engine, but several limits remain:
+
+1. Synthetic data is not field proof
+   - The generator is valuable for coverage, but business claims need field outcome data from real deployments.
+
+2. No pricing model
+   - This is intentional and correct, but ROI must be measured through workflow efficiency and follow-up conversion, not automated savings estimates.
+
+3. No migration dependency model
+   - The tool can identify migration review candidates but cannot determine application waves, dependencies, network flows, or cutover sequencing.
+
+4. No backup verification
+   - Backup metadata can support DR tier review, but successful restore or recoverability cannot be inferred.
+
+5. No business criticality source
+   - Backup size, RPO, and workload name are not business criticality. Application owner validation remains required.
+
+6. Input readiness can be low by design
+   - The generated real-world inventory and backup data intentionally include serious data quality issues. The product should present this as evidence of validation strength, not as a clean demo dataset.
+
+7. Ranking mode affects story shape
+   - Global ranking can bury archive and right-sizing stories. Demo scripts and partner workflows should select ranking mode intentionally.
+
+8. Feedback data is still minimal
+   - The mechanism exists, but real business impact requires a larger outcome ledger.
+
+9. Policy governance needs real operating process
+   - Versioned policy packs are present, but a production program needs owners, approval cadence, change logs, and rollback rules.
+
+10. Adapters need field diversity
+   - The architecture supports mapper expansion, but broad defensibility requires many real export shapes, not just synthetic coverage.
+
+## Recommended demo narrative
+
+The most credible live demo should not start with the ranked CSV. It should start with the operating problem:
+
+1. "We received ordinary exports."
+2. "We validate whether they are fit for customer-facing triage."
+3. "We resolve identity and expose conflicts."
+4. "We compute only evidence-backed features."
+5. "We apply a governed policy pack."
+6. "We generate motion-specific queues."
+7. "We withhold unsafe records."
+8. "We produce missing-evidence requests."
+9. "We redact and bundle the handoff."
+10. "We capture feedback after the workshop."
+
+That narrative makes estate-triage feel like core technology. A CSV output alone feels like a report. The full workflow feels like an assessment operating layer.
+
+## Best near-term productization moves
+
+1. Publish a formal assessment contract
+   - Define required, preferred, and optional evidence per motion.
+
+2. Add policy approval metadata to demo outputs
+   - Show who approved a policy pack, when, and why.
+
+3. Add a field-outcome sample format
+   - Let partners record accepted, rejected, delayed, converted, and expanded findings.
+
+4. Add a demo script that contrasts ranking modes
+   - Show why balanced, global, and per-motion rankings answer different business questions.
+
+5. Add an evidence quality heatmap
+   - Not a web UI, just a CSV or Markdown artifact summarizing data gaps by owner persona.
+
+6. Add customer-facing and internal-facing templates
+   - Customer version should hide low-confidence detail unless relevant.
+   - Internal version should show blockers, conflicts, and missing evidence.
+
+7. Add adapter certification tests
+   - A new adapter should prove it preserves provenance, maps required fields, and does not alter policy semantics.
+
+8. Add an outcome benchmark report
+   - Compare policy versions by accepted rate, false positive rate, needs-more-data rate, and conversion to deeper assessment.
+
+9. Add a field-derived generator profile workflow
+   - Permit customers to derive statistical profiles without storing sensitive workload names.
+
+10. Add governance documentation
+   - Define how policy packs are reviewed, approved, deprecated, and audited.
+
+## Bottom line
+
+estate-triage has credible business value when framed as a pre-sales assessment qualification layer. The top business stories are migration review, archive review, right-sizing review, DR tier review, missing-evidence acceleration, do-not-present trust protection, ranking-mode alignment, privacy-safe handoff, partner assessment factory operations, governed policy consistency, synthetic training coverage, and outcome measurement.
+
+The repo is strongest where it refuses to overclaim. It does not price, verify backups, plan migrations, infer criticality, or invent utilization. That restraint is commercially useful because it gives technical stakeholders a reason to trust the outputs.
+
+The path to defensible core technology is to double down on evidence contracts, identity quality, policy governance, workflow integration, partner feedback, and field-proven outcome metrics. The ranked CSV is only the visible artifact. The defensible core is the repeatable machinery that decides what is ready to discuss, what needs more data, and what should not be presented yet.

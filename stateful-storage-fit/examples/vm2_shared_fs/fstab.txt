@@ -1,0 +1,3 @@
+# shared content mount
+server:/export/content /srv/content nfs4 defaults 0 0
+

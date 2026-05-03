@@ -1,0 +1,14 @@
+recovery_sets:
+  - name: dr-test-001
+    purpose: application recovery-test preflight
+    site: recovery-lab
+    notes: Declared application scope used by the static demo.
+  - name: core-services
+    purpose: shared infrastructure services
+    site: primary
+  - name: data-services
+    purpose: shared data services
+    site: primary
+  - name: shared-services
+    purpose: shared file and platform services
+    site: primary

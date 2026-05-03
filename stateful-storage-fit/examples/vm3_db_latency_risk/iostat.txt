@@ -1,0 +1,10 @@
+Linux 6.1.0 synthetic
+
+Device            r/s     w/s    rkB/s    wkB/s   await  aqu-sz  %util
+sda              0.10    0.30     4.00    12.00    0.70    0.01   1.00
+sdb              8.00   40.00  2048.00 16000.00   12.00    1.20  55.00
+
+Device            r/s     w/s    rkB/s    wkB/s   await  aqu-sz  %util
+sda              0.10    0.20     4.00     8.00    0.60    0.01   1.00
+sdb             12.00   55.00  4096.00 32000.00   24.80    2.30  72.00
+

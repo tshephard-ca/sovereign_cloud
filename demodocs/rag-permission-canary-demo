@@ -1,0 +1,236 @@
+# rag-permission-canary Demo
+
+Generated: 2026-05-03
+
+Target repository: `rag-permission-canary`
+
+## Demo Goal
+
+This demo shows `rag-permission-canary` as a release gate for permission-aware RAG and AI search endpoints.
+
+The question is not “is the whole system secure?”
+
+The question is:
+
+> For a known synthetic permission fixture, can tested users retrieve allowed documents while forbidden evidence stays out of answers, citations, snippets, metadata, and raw context?
+
+That is the business throughline. Permission mistakes are a high-friction blocker for internal AI search. A deterministic canary pack gives AI platform, security, IAM, and release teams evidence they can review before broad rollout or before shipping connector, index, ACL-sync, prompt, model, or response-schema changes.
+
+## Demo Inputs
+
+The strongest built-in fixture lives under:
+
+```text
+rag-permission-canary/examples/demo_enterprise_boundary/
+```
+
+It is generated, deterministic, and synthetic.
+
+It contains:
+
+- 20 documents.
+- 4 test users.
+- HR, finance, legal, engineering, and public collections.
+- Explicit allow and deny rules.
+- High-entropy exact canary strings.
+- High-entropy metadata markers.
+- Endpoint response extractors for answer text, citations, snippets, metadata, and raw context.
+- `access_matrix.csv`.
+- `boundary_coverage.csv`.
+- `fixture_quality.json`.
+- `canary_pack.yml`.
+- `canary_queries.csv`.
+
+Regenerate it with:
+
+```bash
+PYTHONPATH=src python -m rag_permission_canary.cli generate-demo-fixtures \
+  --output-dir examples/demo_enterprise_boundary \
+  --users 4 \
+  --documents 20 \
+  --seed 7 \
+  --force \
+  --now 2026-01-01T00:00:00Z
+```
+
+The generated fixture quality should be `STRONG`.
+
+## Demo Flow
+
+### 1. Assess the input fixture
+
+```bash
+PYTHONPATH=src python -m rag_permission_canary.cli assess-fixture \
+  --content examples/demo_enterprise_boundary/content_set.yml \
+  --users examples/demo_enterprise_boundary/test_users.yml \
+  --permissions examples/demo_enterprise_boundary/permissions.yml \
+  --endpoint examples/demo_enterprise_boundary/endpoint.yml \
+  --config examples/demo_enterprise_boundary/thresholds.yml \
+  --pack examples/demo_enterprise_boundary/canary_pack.yml \
+  --output-quality-json out/fixture_quality.json \
+  --output-quality-markdown out/fixture_quality.md \
+  --output-access-matrix out/access_matrix.csv \
+  --output-boundary-coverage out/boundary_coverage.csv
+```
+
+What this proves:
+
+- The fixture has enough positive and negative permission coverage.
+- The canary strings are unique.
+- The metadata evidence markers are not noisy shared values.
+- Every test user has both allowed and forbidden documents.
+- The endpoint profile defines the surfaces the run is expected to inspect.
+
+### 2. Run the safe local simulation
+
+```bash
+PYTHONPATH=src python -m rag_permission_canary.cli run-demo \
+  --output-dir /tmp/rpc-demo-safe \
+  --mode safe \
+  --users 4 \
+  --documents 20 \
+  --seed 7 \
+  --force \
+  --now 2026-01-01T00:00:00Z
+```
+
+Expected result:
+
+```text
+aggregate_status = PASS
+release_decision = ALLOW_NEXT_STAGE
+confidence = HIGH
+```
+
+Business meaning:
+
+The tested users retrieved allowed evidence and did not receive forbidden evidence through any configured response surface. This supports moving to the next release stage for the tested boundaries. It does not prove the entire system is secure forever.
+
+### 3. Run the leaky local simulation
+
+```bash
+PYTHONPATH=src python -m rag_permission_canary.cli run-demo \
+  --output-dir /tmp/rpc-demo-leaky \
+  --mode leaky \
+  --users 4 \
+  --documents 20 \
+  --seed 7 \
+  --force \
+  --now 2026-01-01T00:00:00Z
+```
+
+Expected result:
+
+```text
+aggregate_status = FAIL
+release_decision = BLOCK_RELEASE
+confidence = HIGH
+recommended_owner = retrieval_endpoint_owner
+```
+
+Business meaning:
+
+Forbidden documents crossed the permission boundary. The report shows whether the leak appeared in answer text, citations, titles, snippets, metadata, or raw context. The failure is actionable: the retrieval and endpoint teams know which response surfaces to inspect.
+
+### 4. Package the handoff evidence
+
+```bash
+PYTHONPATH=src python -m rag_permission_canary.cli handoff-bundle \
+  --output-zip out/permission_canary_handoff.zip \
+  --pack /tmp/rpc-demo-safe/canary_pack.yml \
+  --queries /tmp/rpc-demo-safe/canary_queries.csv \
+  --results /tmp/rpc-demo-safe/run_safe/results.json \
+  --test-results /tmp/rpc-demo-safe/run_safe/test_results.csv \
+  --report /tmp/rpc-demo-safe/run_safe/permission_regression_report.md \
+  --junit /tmp/rpc-demo-safe/run_safe/junit.xml \
+  --fixture-quality /tmp/rpc-demo-safe/run_safe/fixture_quality.json \
+  --access-matrix /tmp/rpc-demo-safe/run_safe/access_matrix.csv \
+  --boundary-coverage /tmp/rpc-demo-safe/run_safe/boundary_coverage.csv \
+  --endpoint /tmp/rpc-demo-safe/endpoint.yml \
+  --config /tmp/rpc-demo-safe/thresholds.yml
+```
+
+The bundle is a review artifact for release, audit, or security handoff. It is not a compliance certificate.
+
+## What The Output Now Says Clearly
+
+The result JSON includes a decision object:
+
+```json
+{
+  "release_decision": "BLOCK_RELEASE",
+  "business_risk": "Forbidden evidence appeared through tested response surfaces.",
+  "confidence": "HIGH",
+  "tested_boundaries": 20,
+  "surfaces_tested": ["answer", "citations", "snippets", "metadata", "raw_context"],
+  "leak_channels": ["forbidden_canary_leaks", "forbidden_doc_id_citations"],
+  "recommended_owner": "retrieval_endpoint_owner"
+}
+```
+
+The Markdown report starts with the release decision, not a raw count table. Counts still exist, but they support the decision instead of replacing it.
+
+The access matrix answers:
+
+- Which user/document pairs are expected allowed?
+- Which are expected forbidden?
+- Which pairs were actually tested?
+- Which allowed pairs produced positive evidence?
+- Which forbidden pairs leaked?
+
+The boundary coverage table summarizes the same evidence by user and collection.
+
+## Why This Has Business Impact
+
+This project is most compelling as a permission-regression gate for enterprise AI search.
+
+High-value moments:
+
+- Before launching an internal assistant over mixed restricted and public content.
+- Before shipping connector or ACL-sync changes.
+- Before changing index filters, prompt templates, citation schemas, snippets, or debug/raw-context fields.
+- During security review when stakeholders need repeatable evidence rather than informal demos.
+- During incident triage when teams need to know whether leakage came from answer text, citations, snippets, metadata, or raw context.
+
+The ROI is operational and risk-adjusted:
+
+- Fewer late-stage launch delays caused by vague ACL uncertainty.
+- Lower chance of a damaging internal disclosure.
+- Faster triage when a permission regression appears.
+- CI-native evidence for release gates.
+- Safer handoff artifacts for security, audit, and platform teams.
+
+## Architecture Throughline
+
+The repo now follows a cleaner pipeline:
+
+1. `content_set.yml`, `test_users.yml`, `permissions.yml`, and `endpoint.yml` define the permission fixture.
+2. `access_matrix.py` turns that fixture into expected user/document boundaries.
+3. `fixture_quality.py` checks whether the fixture is strong enough to support a release gate.
+4. `canary_generate.py` creates deterministic allowed and forbidden test cases.
+5. `http_client.py` calls a real endpoint during normal runs; `demo_runner.py` uses local safe/leaky transports for demos.
+6. `response_extract.py` extracts answer, citation, snippet, metadata, and raw-context surfaces.
+7. `leakage_detect.py` performs exact forbidden-evidence checks.
+8. `scoring.py` and `decision.py` convert evidence into PASS, FAIL, REVIEW, and release-decision language.
+9. `report.py`, `junit.py`, and `handoff.py` emit reviewable evidence.
+
+## Honest Caveats
+
+- A canary pack tests only supplied users, documents, permissions, and queries.
+- Exact canary matching does not detect every paraphrased leak.
+- Synthetic content may not match production retrieval behavior.
+- The endpoint must already be configured to use the intended identity context.
+- The tool does not verify identity-provider, connector, index, or model internals.
+- Missing response fields reduce confidence.
+- User-supplied permissions may not reflect real production permissions.
+- Query wording can affect retrieval behavior.
+- A handoff bundle is scoped evidence, not certification.
+- This is a regression test, not an access-control implementation.
+
+## Bottom Line
+
+`rag-permission-canary` is not valuable because it generates another report.
+
+It is valuable because it converts a difficult enterprise AI adoption concern into deterministic release evidence:
+
+> tested users can retrieve allowed content, and forbidden content does not leak through answer text, citations, snippets, metadata, or raw context.

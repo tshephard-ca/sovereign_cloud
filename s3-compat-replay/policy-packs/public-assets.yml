@@ -1,0 +1,17 @@
+schema_version: 1
+name: public-assets
+description: Public website or application asset buckets with read-heavy object access and browser behavior.
+workload_type: public_assets
+required_families:
+  - object_read
+  - object_list
+severity_overrides:
+  CORS_PREFLIGHT_MISMATCH: BLOCKER
+  PRESIGNED_URL_FAILED: REVIEW
+required_hints:
+  - content_types
+  - cors
+evidence_quality_minimum: MEDIUM
+human_questions:
+  - Which origins need browser access?
+  - Are cache headers or content types consumed by clients?

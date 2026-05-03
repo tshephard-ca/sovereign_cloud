@@ -1,0 +1,8 @@
+min_query_count: 2
+high_confidence_min_clients: 2
+unmapped_client_warning_pct: 25
+require_resolver_identity_for_pass: true
+include_external_by_default: false
+severity:
+  known_prereq_missing: WARNING
+  heuristic_prereq_missing: REVIEW

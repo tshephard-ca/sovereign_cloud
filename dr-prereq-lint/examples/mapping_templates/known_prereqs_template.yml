@@ -1,0 +1,20 @@
+internal_domains:
+  - example.internal
+
+prerequisites:
+  - id: license_core
+    display_name: License service
+    category: license_server
+    names:
+      - license01.apps.example.internal
+    qname_regex:
+      - '(^|\.)license[0-9-]*\.apps\.example\.internal$'
+    required_in_recovery_set: true
+  - id: database_core
+    display_name: Core database service
+    category: database_host
+    names:
+      - sql01.apps.example.internal
+    qname_regex:
+      - '(^|\.)(sql|db)[0-9-]*\.apps\.example\.internal$'
+    required_in_recovery_set: true

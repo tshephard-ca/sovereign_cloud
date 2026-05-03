@@ -1,0 +1,12 @@
+min_query_count: 1
+high_confidence_min_clients: 1
+unmapped_client_warning_pct: 10
+require_resolver_identity_for_pass: true
+include_external_by_default: false
+severity:
+  dns_resolver_missing: CRITICAL
+  directory_role_missing: CRITICAL
+  kerberos_role_missing: CRITICAL
+  specific_target_missing: CRITICAL
+  known_prereq_missing: WARNING
+  heuristic_prereq_missing: REVIEW

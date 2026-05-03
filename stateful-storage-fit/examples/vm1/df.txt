@@ -1,0 +1,5 @@
+Filesystem     Type      1B-blocks         Used    Available Use% Mounted on
+/dev/sda1      ext4   107374182400  21474836480  85899345920  20% /
+tmpfs          tmpfs    2147483648            0   2147483648   0% /run
+/dev/sdb1      xfs    214748364800 107374182400 107374182400  50% /data
+

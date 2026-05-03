@@ -1,0 +1,325 @@
+content_set_id: generated_enterprise_permission_boundary
+content_set_version: 1
+description: Synthetic enterprise-style permission boundary fixture with unique canary
+  and metadata markers.
+documents:
+- doc_id: doc_hr_001
+  title: Hr Boundary Record 001
+  collection: hr
+  sensitivity: restricted
+  metadata:
+    department: hr
+    record_type: hr_boundary_record
+    permission_marker: MARKER_HR_001_A5CD68
+    case_marker: CASE_001_CA26
+  body: Hr Boundary Record 001 is synthetic permission-regression evidence. It contains
+    exact canary CANARY_HR_001_4D3C1A and metadata marker MARKER_HR_001_A5CD68. This
+    text is not production confidential information.
+  canaries:
+  - canary_id: canary_hr_001
+    text: CANARY_HR_001_4D3C1A
+    description: Synthetic exact permission canary.
+- doc_id: doc_finance_002
+  title: Finance Boundary Record 002
+  collection: finance
+  sensitivity: restricted
+  metadata:
+    department: finance
+    record_type: finance_boundary_record
+    permission_marker: MARKER_FINANCE_002_18B8FF
+    case_marker: CASE_002_3031
+  body: Finance Boundary Record 002 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_FINANCE_002_25165E and metadata marker MARKER_FINANCE_002_18B8FF.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_finance_002
+    text: CANARY_FINANCE_002_25165E
+    description: Synthetic exact permission canary.
+- doc_id: doc_legal_003
+  title: Legal Boundary Record 003
+  collection: legal
+  sensitivity: restricted
+  metadata:
+    department: legal
+    record_type: legal_boundary_record
+    permission_marker: MARKER_LEGAL_003_BB3B93
+    case_marker: CASE_003_6DEC
+  body: Legal Boundary Record 003 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_LEGAL_003_1DB208 and metadata marker MARKER_LEGAL_003_BB3B93.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_legal_003
+    text: CANARY_LEGAL_003_1DB208
+    description: Synthetic exact permission canary.
+- doc_id: doc_engineering_004
+  title: Engineering Boundary Record 004
+  collection: engineering
+  sensitivity: restricted
+  metadata:
+    department: engineering
+    record_type: engineering_boundary_record
+    permission_marker: MARKER_ENGINEERING_004_1332A1
+    case_marker: CASE_004_DE06
+  body: Engineering Boundary Record 004 is synthetic permission-regression evidence.
+    It contains exact canary CANARY_ENGINEERING_004_2C0146 and metadata marker MARKER_ENGINEERING_004_1332A1.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_engineering_004
+    text: CANARY_ENGINEERING_004_2C0146
+    description: Synthetic exact permission canary.
+- doc_id: doc_public_005
+  title: Public Boundary Record 005
+  collection: public
+  sensitivity: public
+  metadata:
+    department: public
+    record_type: public_boundary_record
+    permission_marker: MARKER_PUBLIC_005_D61AA9
+    case_marker: CASE_005_7B38
+  body: Public Boundary Record 005 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_PUBLIC_005_23C417 and metadata marker MARKER_PUBLIC_005_D61AA9.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_public_005
+    text: CANARY_PUBLIC_005_23C417
+    description: Synthetic exact permission canary.
+- doc_id: doc_hr_006
+  title: Hr Boundary Record 006
+  collection: hr
+  sensitivity: restricted
+  metadata:
+    department: hr
+    record_type: hr_boundary_record
+    permission_marker: MARKER_HR_006_2E71EF
+    case_marker: CASE_006_1E43
+  body: Hr Boundary Record 006 is synthetic permission-regression evidence. It contains
+    exact canary CANARY_HR_006_D95A94 and metadata marker MARKER_HR_006_2E71EF. This
+    text is not production confidential information.
+  canaries:
+  - canary_id: canary_hr_006
+    text: CANARY_HR_006_D95A94
+    description: Synthetic exact permission canary.
+- doc_id: doc_finance_007
+  title: Finance Boundary Record 007
+  collection: finance
+  sensitivity: restricted
+  metadata:
+    department: finance
+    record_type: finance_boundary_record
+    permission_marker: MARKER_FINANCE_007_3F62F8
+    case_marker: CASE_007_1FAC
+  body: Finance Boundary Record 007 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_FINANCE_007_724C60 and metadata marker MARKER_FINANCE_007_3F62F8.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_finance_007
+    text: CANARY_FINANCE_007_724C60
+    description: Synthetic exact permission canary.
+- doc_id: doc_legal_008
+  title: Legal Boundary Record 008
+  collection: legal
+  sensitivity: restricted
+  metadata:
+    department: legal
+    record_type: legal_boundary_record
+    permission_marker: MARKER_LEGAL_008_CB19B4
+    case_marker: CASE_008_7131
+  body: Legal Boundary Record 008 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_LEGAL_008_1963C5 and metadata marker MARKER_LEGAL_008_CB19B4.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_legal_008
+    text: CANARY_LEGAL_008_1963C5
+    description: Synthetic exact permission canary.
+- doc_id: doc_engineering_009
+  title: Engineering Boundary Record 009
+  collection: engineering
+  sensitivity: restricted
+  metadata:
+    department: engineering
+    record_type: engineering_boundary_record
+    permission_marker: MARKER_ENGINEERING_009_17D9AF
+    case_marker: CASE_009_9447
+  body: Engineering Boundary Record 009 is synthetic permission-regression evidence.
+    It contains exact canary CANARY_ENGINEERING_009_442F7D and metadata marker MARKER_ENGINEERING_009_17D9AF.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_engineering_009
+    text: CANARY_ENGINEERING_009_442F7D
+    description: Synthetic exact permission canary.
+- doc_id: doc_public_010
+  title: Public Boundary Record 010
+  collection: public
+  sensitivity: public
+  metadata:
+    department: public
+    record_type: public_boundary_record
+    permission_marker: MARKER_PUBLIC_010_D69964
+    case_marker: CASE_010_3C4F
+  body: Public Boundary Record 010 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_PUBLIC_010_49DBCD and metadata marker MARKER_PUBLIC_010_D69964.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_public_010
+    text: CANARY_PUBLIC_010_49DBCD
+    description: Synthetic exact permission canary.
+- doc_id: doc_hr_011
+  title: Hr Boundary Record 011
+  collection: hr
+  sensitivity: restricted
+  metadata:
+    department: hr
+    record_type: hr_boundary_record
+    permission_marker: MARKER_HR_011_9DF154
+    case_marker: CASE_011_34C3
+  body: Hr Boundary Record 011 is synthetic permission-regression evidence. It contains
+    exact canary CANARY_HR_011_5C882B and metadata marker MARKER_HR_011_9DF154. This
+    text is not production confidential information.
+  canaries:
+  - canary_id: canary_hr_011
+    text: CANARY_HR_011_5C882B
+    description: Synthetic exact permission canary.
+- doc_id: doc_finance_012
+  title: Finance Boundary Record 012
+  collection: finance
+  sensitivity: restricted
+  metadata:
+    department: finance
+    record_type: finance_boundary_record
+    permission_marker: MARKER_FINANCE_012_6030A1
+    case_marker: CASE_012_31E2
+  body: Finance Boundary Record 012 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_FINANCE_012_BEAAE4 and metadata marker MARKER_FINANCE_012_6030A1.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_finance_012
+    text: CANARY_FINANCE_012_BEAAE4
+    description: Synthetic exact permission canary.
+- doc_id: doc_legal_013
+  title: Legal Boundary Record 013
+  collection: legal
+  sensitivity: restricted
+  metadata:
+    department: legal
+    record_type: legal_boundary_record
+    permission_marker: MARKER_LEGAL_013_2025E0
+    case_marker: CASE_013_6973
+  body: Legal Boundary Record 013 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_LEGAL_013_1E840B and metadata marker MARKER_LEGAL_013_2025E0.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_legal_013
+    text: CANARY_LEGAL_013_1E840B
+    description: Synthetic exact permission canary.
+- doc_id: doc_engineering_014
+  title: Engineering Boundary Record 014
+  collection: engineering
+  sensitivity: restricted
+  metadata:
+    department: engineering
+    record_type: engineering_boundary_record
+    permission_marker: MARKER_ENGINEERING_014_FE2A0A
+    case_marker: CASE_014_A0D7
+  body: Engineering Boundary Record 014 is synthetic permission-regression evidence.
+    It contains exact canary CANARY_ENGINEERING_014_DAED60 and metadata marker MARKER_ENGINEERING_014_FE2A0A.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_engineering_014
+    text: CANARY_ENGINEERING_014_DAED60
+    description: Synthetic exact permission canary.
+- doc_id: doc_public_015
+  title: Public Boundary Record 015
+  collection: public
+  sensitivity: public
+  metadata:
+    department: public
+    record_type: public_boundary_record
+    permission_marker: MARKER_PUBLIC_015_EE635E
+    case_marker: CASE_015_B921
+  body: Public Boundary Record 015 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_PUBLIC_015_E807C8 and metadata marker MARKER_PUBLIC_015_EE635E.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_public_015
+    text: CANARY_PUBLIC_015_E807C8
+    description: Synthetic exact permission canary.
+- doc_id: doc_hr_016
+  title: Hr Boundary Record 016
+  collection: hr
+  sensitivity: restricted
+  metadata:
+    department: hr
+    record_type: hr_boundary_record
+    permission_marker: MARKER_HR_016_997B0F
+    case_marker: CASE_016_5C0A
+  body: Hr Boundary Record 016 is synthetic permission-regression evidence. It contains
+    exact canary CANARY_HR_016_7F31C4 and metadata marker MARKER_HR_016_997B0F. This
+    text is not production confidential information.
+  canaries:
+  - canary_id: canary_hr_016
+    text: CANARY_HR_016_7F31C4
+    description: Synthetic exact permission canary.
+- doc_id: doc_finance_017
+  title: Finance Boundary Record 017
+  collection: finance
+  sensitivity: restricted
+  metadata:
+    department: finance
+    record_type: finance_boundary_record
+    permission_marker: MARKER_FINANCE_017_7CFA37
+    case_marker: CASE_017_99BA
+  body: Finance Boundary Record 017 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_FINANCE_017_29E8E6 and metadata marker MARKER_FINANCE_017_7CFA37.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_finance_017
+    text: CANARY_FINANCE_017_29E8E6
+    description: Synthetic exact permission canary.
+- doc_id: doc_legal_018
+  title: Legal Boundary Record 018
+  collection: legal
+  sensitivity: restricted
+  metadata:
+    department: legal
+    record_type: legal_boundary_record
+    permission_marker: MARKER_LEGAL_018_FD7FE4
+    case_marker: CASE_018_E5CD
+  body: Legal Boundary Record 018 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_LEGAL_018_AFDC0B and metadata marker MARKER_LEGAL_018_FD7FE4.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_legal_018
+    text: CANARY_LEGAL_018_AFDC0B
+    description: Synthetic exact permission canary.
+- doc_id: doc_engineering_019
+  title: Engineering Boundary Record 019
+  collection: engineering
+  sensitivity: restricted
+  metadata:
+    department: engineering
+    record_type: engineering_boundary_record
+    permission_marker: MARKER_ENGINEERING_019_936C94
+    case_marker: CASE_019_3C73
+  body: Engineering Boundary Record 019 is synthetic permission-regression evidence.
+    It contains exact canary CANARY_ENGINEERING_019_257A95 and metadata marker MARKER_ENGINEERING_019_936C94.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_engineering_019
+    text: CANARY_ENGINEERING_019_257A95
+    description: Synthetic exact permission canary.
+- doc_id: doc_public_020
+  title: Public Boundary Record 020
+  collection: public
+  sensitivity: public
+  metadata:
+    department: public
+    record_type: public_boundary_record
+    permission_marker: MARKER_PUBLIC_020_D61431
+    case_marker: CASE_020_AF21
+  body: Public Boundary Record 020 is synthetic permission-regression evidence. It
+    contains exact canary CANARY_PUBLIC_020_5475E9 and metadata marker MARKER_PUBLIC_020_D61431.
+    This text is not production confidential information.
+  canaries:
+  - canary_id: canary_public_020
+    text: CANARY_PUBLIC_020_5475E9
+    description: Synthetic exact permission canary.

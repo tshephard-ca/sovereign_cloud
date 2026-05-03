@@ -1,0 +1,36 @@
+workload_id: embedding_search
+display_name: Synthetic embedding search workload
+workload_type: embedding
+
+model:
+  declared_model_name: generic-embedding-model
+  model_family: embedding
+  min_context_window_tokens: 2048
+  expected_input_tokens_p50: 80
+  expected_input_tokens_p95: 200
+  expected_output_tokens_p50: 0
+  expected_output_tokens_p95: 0
+  streaming_required: false
+
+benchmark:
+  synthetic_prompt_count: 10
+  warmup_requests: 1
+  measured_requests: 10
+  concurrency: 1
+  request_timeout_seconds: 30
+  random_seed: 12345
+
+request:
+  method: POST
+  path: /v1/embeddings
+  headers:
+    Content-Type: application/json
+  body_template:
+    model: "{{model_name}}"
+    input: "{{prompt}}"
+
+response_extractors:
+  non_streaming:
+    text_json_path: "$.data[0].embedding"
+    usage_input_tokens_json_path: "$.usage.prompt_tokens"
+    usage_output_tokens_json_path: "$.usage.completion_tokens"

@@ -1,0 +1,30 @@
+max_events_to_process: 100000
+top_events_default: 500
+max_probes_default: 100
+key_hash_length: 12
+min_scratch_prefix_length: 8
+synthetic_body_max_bytes: 1024
+request_timeout_seconds: 10
+retries: 2
+
+sampling:
+  max_examples_per_operation_family: 10
+  prefer_successful_source_events: true
+  include_source_error_shapes: true
+
+comparison:
+  compare_status_code: true
+  compare_s3_error_code: true
+  compare_error_message: false
+  compare_critical_headers: true
+  compare_etag_for_singlepart: true
+  compare_etag_for_multipart: false
+  compare_xml_parseability: true
+
+safety:
+  allow_writes_by_default: false
+  allow_deletes_by_default: false
+  allow_acl_tests_by_default: false
+  allow_multipart_by_default: false
+  allow_object_lock_tests_by_default: false
+  cleanup_by_default: true

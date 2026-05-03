@@ -1,0 +1,6 @@
+accepted_risks:
+  - id: example_external_service
+    category: vpn_endpoint
+    name: portal.external.test
+    reason: Provided outside this recovery-set prerequisite review.
+    expires: '2026-12-31'

@@ -1,0 +1,16 @@
+source_kind: inventory
+schema_version: 1.0.0
+columns:
+  name: VM
+  uuid: VM UUID
+  power_state: Powerstate
+  cpu_count: CPUs
+  memory_mib: Memory MiB
+  provisioned_mib: Provisioned MiB
+  in_use_mib: In Use MiB
+  os: OS
+  snapshot_total_mib: Snapshot total MiB
+  cpu_usage_pct: CPU usage percent
+  memory_usage_pct: Memory usage percent
+  tags: Tags
+  notes: Notes

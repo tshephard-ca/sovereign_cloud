@@ -1,0 +1,39 @@
+endpoint_id: rag_endpoint_under_test
+base_url: https://rag-endpoint.example.invalid
+local_test_only: false
+request:
+  method: POST
+  path: /query
+  headers:
+    Content-Type: application/json
+  body_template:
+    query: "{{query}}"
+    user_id: "{{user_id}}"
+    mode: "search_and_summarize"
+    max_results: 5
+auth:
+  user_auth_from_test_user: true
+response_extractors:
+  answer_text_json_path: "$.answer"
+  citations_json_path: "$.citations"
+  citation_doc_id_json_path: "$.doc_id"
+  citation_title_json_path: "$.title"
+  citation_snippet_json_path: "$.snippet"
+  metadata_json_path: "$.metadata"
+  raw_context_json_path: "$.retrieved_context"
+behavior:
+  expected_forbidden_response:
+    allow_empty_answer: true
+    allow_no_results_text: true
+    no_results_phrases:
+      - "no results"
+      - "not available"
+      - "I don't have access"
+      - "not found"
+      - "cannot find"
+  require_citations_for_allowed: false
+  fail_on_forbidden_citation_doc_id: true
+  fail_on_forbidden_title: true
+  fail_on_forbidden_metadata: true
+  fail_on_forbidden_snippet: true
+  fail_on_forbidden_summary: true

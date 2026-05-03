@@ -1,0 +1,19 @@
+schema_version: 1
+name: data-lake
+description: Data lake buckets where prefix listing, metadata, tags, multipart upload, and partition-shaped keys matter.
+workload_type: data_lake
+required_families:
+  - object_write
+  - object_read
+  - object_list
+severity_overrides:
+  TAGGING_ROUNDTRIP_FAILED: REVIEW
+  METADATA_ROUNDTRIP_FAILED: REVIEW
+  MULTIPART_COMPLETE_FAILED: BLOCKER
+required_hints:
+  - metadata_headers
+  - object_tags
+evidence_quality_minimum: MEDIUM
+human_questions:
+  - Which tags or metadata fields are used for query planning or governance?
+  - Do writers rely on multipart upload and list consistency semantics?

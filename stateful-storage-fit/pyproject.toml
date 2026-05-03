@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stateful-storage-fit"
+version = "0.1.0"
+description = "Local-only storage fit preflight for VM-based stateful workloads."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "stateful-storage-fit contributors" }
+]
+dependencies = [
+  "typer>=0.9",
+  "pydantic>=1.10",
+  "PyYAML>=6.0"
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=7.0"
+]
+
+[project.scripts]
+stateful-storage-fit = "stateful_storage_fit.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+

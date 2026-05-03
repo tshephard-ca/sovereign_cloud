@@ -1,0 +1,6 @@
+Please rewrite this clinical note.
+
+patient_id: PT-10045
+diagnosis: elevated glucose
+medication: metformin 500 mg twice daily
+symptoms: fatigue and blurred vision

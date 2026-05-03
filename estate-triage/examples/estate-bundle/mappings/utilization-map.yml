@@ -1,0 +1,14 @@
+source_kind: utilization
+schema_version: 1.0.0
+columns:
+  name: VM
+  uuid: VM UUID
+  sample_start_utc: sample_start_utc
+  sample_end_utc: sample_end_utc
+  cpu_avg_pct: cpu_avg_pct
+  cpu_p95_pct: cpu_p95_pct
+  cpu_max_pct: cpu_max_pct
+  memory_avg_pct: memory_avg_pct
+  memory_p95_pct: memory_p95_pct
+  memory_max_pct: memory_max_pct
+  sample_count: sample_count

@@ -1,0 +1,81 @@
+# inference-placement-bench demo brief
+
+This companion demo points to the cleaned repository workflow in `inference-placement-bench/`.
+
+## Product Throughline
+
+`inference-placement-bench` is a review-only inference placement preflight. It helps a team answer one practical question before integration work starts:
+
+> Which candidate endpoint should be reviewed for this workload after declared location, latency, streaming, throughput, reliability, and user-supplied economics are considered?
+
+The tool is not a router, broker, quality evaluator, compliance verifier, capacity reservation system, procurement approval flow, or production readiness stamp.
+
+## Run The Demo
+
+```bash
+cd inference-placement-bench
+
+python -m pip install -e .
+
+inference-placement-bench init-bundle \
+  --template low-latency-chat \
+  --output /tmp/ipb-low-latency \
+  --prompt-count 50
+
+inference-placement-bench evaluate \
+  --bundle /tmp/ipb-low-latency \
+  --output-bundle /tmp/ipb-low-latency-out \
+  --no-network \
+  --now 2026-01-01T00:00:00Z
+```
+
+Review:
+
+1. `/tmp/ipb-low-latency-out/executive_summary.md`
+2. `/tmp/ipb-low-latency-out/recommendation.md`
+3. `/tmp/ipb-low-latency-out/recommendation.json`
+4. `/tmp/ipb-low-latency-out/run_artifacts/samples.csv`
+
+## Scenario Coverage
+
+Run generated negative cases to show the business value beyond a happy path:
+
+```bash
+for template in \
+  location-blocked-fastest \
+  cheapest-latency-risk \
+  streaming-required-missing \
+  high-timeout-review \
+  no-passing-endpoints
+do
+  inference-placement-bench init-bundle \
+    --template "$template" \
+    --output "/tmp/ipb-$template" \
+    --prompt-count 20
+
+  inference-placement-bench evaluate \
+    --bundle "/tmp/ipb-$template" \
+    --output-bundle "/tmp/ipb-$template-out" \
+    --no-network \
+    --max-requests 3 \
+    --warmup-requests 0 \
+    --now 2026-01-01T00:00:00Z
+done
+```
+
+These outputs demonstrate:
+
+- Fastest endpoint can lose because declared location policy blocks it.
+- Cheapest endpoint can lose because it misses latency.
+- Streaming workloads need streaming-capable endpoints.
+- Timeout risk affects confidence and review posture.
+- Sometimes no endpoint should be selected.
+
+## Repo Docs
+
+- `inference-placement-bench/README.md`: quickstart and project boundary.
+- `inference-placement-bench/DEMO.md`: runnable demo steps.
+- `inference-placement-bench/docs/business_cases.md`: business impact and personas.
+- `inference-placement-bench/docs/architecture.md`: implementation flow.
+- `inference-placement-bench/docs/input_contract.md`: required input data.
+- `inference-placement-bench/docs/output_contract.md`: output schema and interpretation.

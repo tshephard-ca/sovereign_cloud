@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Host screen contract data package manifest",
+  "type": "object",
+  "required": ["package_id", "transaction_id", "maturity_level", "traces"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "package_id": { "type": "string" },
+    "transaction_id": { "type": "string" },
+    "maturity_level": { "enum": ["L0", "L1", "L2", "L3", "L4", "L5", "L6"] },
+    "evidence_kind": {
+      "enum": [
+        "deterministic_synthetic",
+        "domain_realistic_synthetic",
+        "sanitized_local_capture",
+        "real_structure_tokenized",
+        "real_multi_case",
+        "real_drift",
+        "portfolio_metrics",
+        null
+      ]
+    },
+    "actual_maturity_level": { "enum": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", null] },
+    "simulates_maturity_level": { "enum": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", null] },
+    "description": { "type": "string" },
+    "traces": { "type": "object", "additionalProperties": { "type": "string" } },
+    "cases": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["trace"],
+        "properties": {
+          "trace": { "type": "string" },
+          "purpose": {
+            "enum": [
+              "canonical_success",
+              "canonical_error",
+              "drift_evidence",
+              "navigation",
+              "non_contract",
+              "guardrail",
+              "recorded_path"
+            ]
+          },
+          "case_kind": { "type": ["string", "null"] },
+          "description": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "field_map": { "type": ["string", "null"] },
+    "replay_cases": { "type": "object", "additionalProperties": { "type": "string" } },
+    "expected_contract": { "type": "string" },
+    "expected_openapi": { "type": "string" },
+    "expected_summary": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

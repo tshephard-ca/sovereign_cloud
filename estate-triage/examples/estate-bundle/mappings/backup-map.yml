@@ -1,0 +1,20 @@
+source_kind: backup
+schema_version: 1.0.0
+columns:
+  name: VM
+  uuid: VM UUID
+  backup_total_mib: backup_total_mib
+  latest_restore_point_utc: latest_restore_point_utc
+  restore_point_count: restore_point_count
+  avg_daily_change_mib: avg_daily_change_mib
+  latest_incremental_mib: latest_incremental_mib
+  backup_job: backup_job
+  backup_policy: backup_policy
+  retention_days: retention_days
+  immutable_until_utc: immutable_until_utc
+  rpo_hours: rpo_hours
+  rto_tier: rto_tier
+  repository: repository
+  protected: protected
+  last_success_utc: last_success_utc
+  last_failure_utc: last_failure_utc

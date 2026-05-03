@@ -1,0 +1,21 @@
+users:
+  - user_id: user_hr
+    display_name: HR Test User
+    auth:
+      type: bearer_env
+      token_env: RAG_CANARY_USER_HR_TOKEN
+    groups:
+      - hr_readers
+      - public_readers
+    attributes:
+      department: hr
+  - user_id: user_finance
+    display_name: Finance Test User
+    auth:
+      type: bearer_env
+      token_env: RAG_CANARY_USER_FINANCE_TOKEN
+    groups:
+      - finance_readers
+      - public_readers
+    attributes:
+      department: finance

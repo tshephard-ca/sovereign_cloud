@@ -1,0 +1,20 @@
+schema_version: "1.0"
+recovery_set: dr-test-001
+
+inputs:
+  backup_inventory: backup_inventory.csv
+  dns_queries: dns_queries.csv
+  prerequisite_catalog: prerequisite_catalog.yml
+  required_resolvers: required_resolvers.yml
+  recovery_sets: recovery_sets.yml
+  owner_map: owner_map.csv
+  policy: policy.yml
+
+policy:
+  pack: isolated_recovery_lab
+  window_hours: 24
+  compare_window_hours:
+    - 24
+    - 168
+  include_unmapped_clients: false
+  include_external: false

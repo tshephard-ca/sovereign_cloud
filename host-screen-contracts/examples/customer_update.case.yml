@@ -1,0 +1,12 @@
+transaction_id: customer_update
+case_id: happy_path_customer_update
+start_screen_hash: ef68c396ed80
+steps:
+  - expect_screen_hash: ef68c396ed80
+    inputs:
+      account_number: "1234567890"
+      phone: "5550100"
+    aid: ENTER
+    expect_next_screen_hash: 311d1fa2c478
+expected_response:
+  update_status: UPDATED

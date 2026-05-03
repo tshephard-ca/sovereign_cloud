@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Host screen transaction contract",
+  "type": "object",
+  "required": ["transaction_id", "display_name", "endpoint_path", "confidence", "screens", "transitions", "request_fields", "response_fields"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "transaction_id": { "type": "string" },
+    "display_name": { "type": "string" },
+    "endpoint_path": { "type": "string" },
+    "confidence": { "enum": ["HIGH", "MEDIUM", "LOW"] },
+    "screens": { "type": "array" },
+    "transitions": { "type": "array" },
+    "request_fields": { "type": "array" },
+    "response_fields": { "type": "array" },
+    "replay_cases": { "type": "array" },
+    "flow_graph": { "type": "object" },
+    "volatile_regions": { "type": "array" },
+    "field_map_fields": { "type": "array" },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "blockers": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

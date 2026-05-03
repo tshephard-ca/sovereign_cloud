@@ -1,0 +1,34 @@
+required_window_days: 7
+default_bucket_minutes: 5
+minimum_coverage_pct: 85
+
+sustained_window_minutes: 60
+burst_window_minutes: 5
+burst_percentile: 99
+sustained_percentile: 95
+
+min_power_variation_kw_for_thermal_model: 2.0
+min_power_variation_pct_for_thermal_model: 10
+min_temp_variation_c_for_thermal_model: 0.5
+min_thermal_model_r2: 0.20
+min_positive_temp_slope_c_per_kw: 0.02
+max_default_thermal_extrapolation_kw: 5.0
+
+default_power_headroom_pct: 10
+default_min_power_headroom_kw: 1.0
+default_temp_headroom_c: 2.0
+
+high_trip_risk_margin_kw: 1.0
+medium_trip_risk_margin_kw: 2.0
+
+high_thermal_risk_margin_c: 1.0
+medium_thermal_risk_margin_c: 2.0
+
+plausible_min_temp_c: 0
+plausible_max_temp_c: 60
+
+feed_imbalance_warning_pct: 20
+feed_imbalance_critical_pct: 35
+
+redaction_hash_length: 12
+allow_all_zero_power: false

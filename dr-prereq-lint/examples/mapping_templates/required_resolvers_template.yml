@@ -1,0 +1,5 @@
+resolvers:
+  - name: dns01.example.internal
+    ip_addresses:
+      - 10.0.0.10
+    recovery_required: true

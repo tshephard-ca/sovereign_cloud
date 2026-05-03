@@ -1,0 +1,52 @@
+{
+  "event_id": "evt-2026-001",
+  "started_at": "2026-01-01T00:00:00Z",
+  "observed_at": "2026-01-01T00:03:00Z",
+  "severity": "HIGH",
+  "attack_class": "VOLUMETRIC",
+  "mitigation_state": "ACTIVE",
+  "confidence": "HIGH",
+  "targets": [
+    {
+      "name": "public_web_vip",
+      "ip": "203.0.113.10",
+      "protocol": "tcp",
+      "ports": [80, 443],
+      "observed_bps": 1500000000,
+      "observed_pps": 900000,
+      "baseline_bps": 100000000,
+      "baseline_pps": 80000
+    },
+    {
+      "name": "vpn_vip",
+      "ip": "203.0.113.20",
+      "protocol": "udp",
+      "ports": [500, 4500],
+      "observed_bps": 250000000,
+      "observed_pps": 120000,
+      "baseline_bps": 50000000,
+      "baseline_pps": 30000
+    }
+  ],
+  "signals": {
+    "top_source_countries": ["ZZ"],
+    "top_source_asns": ["asn-64500"],
+    "top_source_prefixes": ["198.51.100.0/24"],
+    "protocol_mix": {
+      "tcp_syn": 60,
+      "udp": 30,
+      "http_get": 10
+    },
+    "user_agent_anomalies": true,
+    "path_anomalies": ["/login", "/search"],
+    "spoofing_likely": true
+  },
+  "provider_actions_already_active": [
+    "upstream_scrubbing",
+    "syn_protection"
+  ],
+  "notes": [
+    "Normalized sample event for tests."
+  ]
+}
+

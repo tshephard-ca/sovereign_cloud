@@ -1,0 +1,20 @@
+id: vm2-shared-filesystem
+df: ../vm2_shared_fs/df.txt
+mount: ../vm2_shared_fs/mount.txt
+fstab: ../vm2_shared_fs/fstab.txt
+iostat: ../vm2_shared_fs/iostat.txt
+ps: ../vm2_shared_fs/ps.txt
+storage_profile: ../storage-profile.yml
+policy_pack: ../policy-packs/file-server.yml
+expected_fit_status: REVIEW
+expected_requirements:
+  required_access_mode: ReadWriteMany
+  required_volume_mode: Filesystem
+  preferred_storage_kind: file
+labels:
+  workload_family: file_server
+  expected_reason_codes:
+    - SHARED_FS_DETECTED
+    - FILE_SERVER_PROCESS_DETECTED
+reviewer_notes: Synthetic shared filesystem workload that should remain reviewable even with a matching RWX file profile.
+

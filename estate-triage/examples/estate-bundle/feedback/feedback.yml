@@ -1,0 +1,6 @@
+assessment_id: synthetic-local-assessment
+feedback:
+  - workload_key: example-hash
+    finding: DR_TIER_REVIEW
+    outcome: useful
+    notes: replace with local feedback after review

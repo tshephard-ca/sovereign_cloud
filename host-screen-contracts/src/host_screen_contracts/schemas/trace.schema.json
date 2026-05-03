@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/host-screen-contracts/trace.schema.json",
+  "title": "Neutral terminal trace JSONL event",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["type", "seq", "rows", "cols", "text"],
+      "properties": {
+        "type": { "const": "screen" },
+        "seq": { "type": "integer", "minimum": 1 },
+        "timestamp": { "type": "string" },
+        "rows": { "type": "integer", "minimum": 1 },
+        "cols": { "type": "integer", "minimum": 1 },
+        "cursor": { "$ref": "#/$defs/cursor" },
+        "text": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field" },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["type", "seq", "aid"],
+      "properties": {
+        "type": { "const": "action" },
+        "seq": { "type": "integer", "minimum": 1 },
+        "timestamp": { "type": "string" },
+        "aid": { "type": "string", "minLength": 1 },
+        "cursor": { "$ref": "#/$defs/cursor" },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/input" },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["type", "seq"],
+      "properties": {
+        "type": { "const": "note" },
+        "seq": { "type": "integer", "minimum": 1 },
+        "timestamp": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    }
+  ],
+  "$defs": {
+    "cursor": {
+      "type": "object",
+      "required": ["row", "col"],
+      "properties": {
+        "row": { "type": "integer", "minimum": 1 },
+        "col": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "field": {
+      "type": "object",
+      "required": ["row", "col", "length"],
+      "properties": {
+        "id": { "type": "string" },
+        "row": { "type": "integer", "minimum": 1 },
+        "col": { "type": "integer", "minimum": 1 },
+        "length": { "type": "integer", "minimum": 1 },
+        "value": { "type": "string", "default": "" },
+        "protected": { "type": "boolean", "default": false },
+        "display_only": { "type": "boolean", "default": false },
+        "hidden": { "type": "boolean", "default": false },
+        "attributes": { "type": "array", "items": { "type": "string" }, "default": [] }
+      },
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "required": ["value"],
+      "properties": {
+        "field_id": { "type": "string" },
+        "row": { "type": "integer", "minimum": 1 },
+        "col": { "type": "integer", "minimum": 1 },
+        "value": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,28 @@
+default_ttl_minutes: 30
+max_ttl_minutes: 60
+p0_max_ttl_minutes: 30
+p1_max_ttl_minutes: 30
+p2_max_ttl_minutes: 20
+p3_max_ttl_minutes: 15
+p4_max_ttl_minutes: 15
+null_route_max_ttl_minutes: 10
+max_actions: 50
+allow_name_match: false
+require_rollback: true
+require_ttl: true
+fail_on_p0_shed: true
+fail_on_unmatched_event_targets: false
+default_mode: REVIEW_ONLY
+
+source_blocking:
+  enabled_by_default: false
+  min_ipv4_prefix_length: 24
+  min_ipv6_prefix_length: 64
+  require_spoofing_likely_false: true
+
+null_route:
+  enabled_by_default: false
+  p0_allowed: false
+  p1_allowed: false
+  require_allow_flag: true
+

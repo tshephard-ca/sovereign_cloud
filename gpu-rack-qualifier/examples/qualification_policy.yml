@@ -1,0 +1,64 @@
+policy_id: default
+
+evidence:
+  require_nccl_single_node: true
+  require_topo: true
+  require_nvidia_smi_query: true
+  require_bmc_snapshot: false
+  require_pairwise_nccl_for_multinode_label: true
+
+nccl:
+  use_metric: busbw_gbps
+  peer_median_warning_pct: 75
+  peer_median_fail_pct: 50
+  min_single_node_busbw_gbps: null
+  min_pairwise_busbw_gbps: 250
+  timeout_is_quarantine: true
+  correctness_error_is_quarantine: true
+  wrong_count_is_quarantine: true
+  min_message_size_bytes_for_scoring: 67108864
+
+topology:
+  require_nvlink_for_multinode_training: false
+  weak_gpu_gpu_paths:
+    - SYS
+    - PHB
+  review_gpu_gpu_paths:
+    - PXB
+  weak_if_any_gpu_pair_weak: true
+  p2p_nvlink_expected: false
+
+firmware:
+  require_driver_consistency_across_rack: true
+  require_vbios_consistency_within_node: true
+  driver_mismatch_action: REVIEW
+  vbios_mismatch_action: DRAIN_REVIEW
+  cuda_mismatch_action: REVIEW
+
+sensors:
+  health_warning_action: REVIEW
+  health_critical_action: QUARANTINE
+  fan_failure_action: QUARANTINE
+  temp_warning_celsius: 80
+  temp_critical_celsius: 90
+  power_warning_action: REVIEW
+  power_critical_action: QUARANTINE
+
+labels:
+  pass_label: rackq_pass
+  review_label: rackq_review
+  quarantine_label: rackq_quarantine
+  inference_ok_label: gpu_inference_ok
+  single_node_training_ok_label: gpu_training_single_node_ok
+  multi_node_training_ok_label: gpu_training_multinode_ok
+  avoid_multinode_label: gpu_avoid_multinode
+  weak_link_label: gpu_link_weak
+  firmware_review_label: gpu_fw_review
+  sensor_review_label: gpu_sensor_review
+
+quarantine:
+  drain_on_correctness_error: true
+  drain_on_timeout: true
+  drain_on_sensor_critical: true
+  drain_on_missing_gpu: true
+  drain_on_vbios_mismatch: false

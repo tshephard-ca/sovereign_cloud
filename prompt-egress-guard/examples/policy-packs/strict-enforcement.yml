@@ -1,0 +1,58 @@
+policy_id: strict_enforcement
+policy_version: 1
+mode: enforce
+monitored_sites:
+  - site_id: public_ai_1
+    display_name: Public AI Site 1
+    host_permissions:
+      - "https://public-ai-1.example.invalid/*"
+    prompt_selectors:
+      - "textarea"
+      - "[contenteditable='true']"
+      - "[role='textbox']"
+    submit_selectors:
+      - "button[type='submit']"
+    keyboard_submit:
+      ctrl_enter: true
+      cmd_enter: true
+      plain_enter: false
+approved_destination:
+  mode: open_url
+  url: "https://approved-ai.example.invalid/"
+  include_prompt: false
+  include_reason_codes: true
+  include_handoff_id: true
+  unsafe_prompt_transfer_acknowledgement: false
+  clipboard_copy_allowed: false
+actions:
+  default_action: ALLOW
+  thresholds:
+    warn_score: 10
+    redirect_score: 25
+    block_score: 55
+  category_actions:
+    secrets: BLOCK
+    source_code: BLOCK
+    customer_records: BLOCK
+    health_data: BLOCK
+    legal_text: BLOCK
+    internal_identifiers: REDIRECT
+    personal_data: BLOCK
+    financial_data: BLOCK
+audit:
+  enabled: true
+  store_raw_prompt: false
+  store_redacted_excerpt: true
+scanner:
+  max_prompt_chars: 12000
+  entropy_threshold: 4.0
+  min_secret_length: 20
+  confidence_floor_for_block: MEDIUM
+user_experience:
+  show_reason_codes: true
+  allow_continue_on_warn: false
+  allow_continue_on_redirect: false
+  allow_continue_on_block: false
+  overlay_title: "Sensitive prompt risk detected"
+dnr:
+  enabled: false

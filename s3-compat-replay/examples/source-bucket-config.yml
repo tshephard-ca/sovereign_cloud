@@ -1,0 +1,29 @@
+versioning:
+  status: Enabled
+
+object_lock:
+  enabled: true
+  default_retention:
+    mode: GOVERNANCE
+    days: 30
+
+cors:
+  rules:
+    - allowed_origins:
+        - https://app.example.invalid
+      allowed_methods:
+        - GET
+        - PUT
+      allowed_headers:
+        - "*"
+
+lifecycle:
+  rules:
+    - id: expire-temp
+      prefix: tmp/
+      expiration_days: 30
+
+ownership_controls:
+  bucket_owner_enforced: true
+
+requester_pays: false

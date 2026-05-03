@@ -1,0 +1,17 @@
+id: vm1-database
+df: ../vm1/df.txt
+mount: ../vm1/mount.txt
+fstab: ../vm1/fstab.txt
+iostat: ../vm1/iostat.txt
+ps: ../vm1/ps.txt
+storage_profile: ../storage-profile.yml
+expected_fit_status: PASS
+expected_requirements:
+  required_access_mode: ReadWriteOnce
+  required_volume_mode: Filesystem
+  preferred_storage_kind: block
+labels:
+  workload_family: relational_database
+  expected_blockers: []
+reviewer_notes: Synthetic database-like workload with ordinary block-backed filesystem data mount.
+

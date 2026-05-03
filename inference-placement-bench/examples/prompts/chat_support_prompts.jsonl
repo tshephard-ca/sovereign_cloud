@@ -1,0 +1,5 @@
+{"id": "p001", "prompt": "Summarize this short synthetic support ticket and propose one concise reply.", "input_tokens_estimate": 18, "expected_output_tokens_estimate": 40}
+{"id": "p002", "prompt": "Draft a brief response to a synthetic question about account setup steps.", "input_tokens_estimate": 17, "expected_output_tokens_estimate": 40}
+{"id": "p003", "prompt": "Classify this synthetic support note by urgency and provide the next action.", "input_tokens_estimate": 17, "expected_output_tokens_estimate": 32}
+{"id": "p004", "prompt": "Extract the requested action from a generic support message.", "input_tokens_estimate": 13, "expected_output_tokens_estimate": 24}
+{"id": "p005", "prompt": "Rewrite this synthetic policy explanation in plain language.", "input_tokens_estimate": 12, "expected_output_tokens_estimate": 36}

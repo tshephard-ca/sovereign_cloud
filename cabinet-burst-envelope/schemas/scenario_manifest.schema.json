@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/cabinet-burst-envelope/scenario_manifest.schema.json",
+  "title": "Synthetic Scenario Manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "tool_version",
+    "scenario",
+    "cabinet_id",
+    "generated_at",
+    "days",
+    "bucket_minutes",
+    "seed",
+    "files",
+    "expected",
+    "controls"
+  ],
+  "properties": {
+    "schema_version": {"const": "cabinet-burst-envelope.scenario.v1"},
+    "tool_version": {"type": "string"},
+    "scenario": {"type": "string"},
+    "cabinet_id": {"type": "string"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "days": {"type": "integer", "minimum": 1},
+    "bucket_minutes": {"type": "integer", "minimum": 1},
+    "seed": {"type": "integer"},
+    "files": {"type": "object"},
+    "expected": {"type": "object"},
+    "controls": {"type": "object"}
+  },
+  "additionalProperties": true
+}

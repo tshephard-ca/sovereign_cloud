@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gpu-rack-qualifier/quarantine.schema.json",
+  "title": "gpu-rack-qualifier quarantine CSV row",
+  "type": "object",
+  "required": [
+    "node_name",
+    "recommendation",
+    "severity",
+    "confidence",
+    "primary_reason",
+    "reason_codes",
+    "blockers",
+    "suggested_slurm_state",
+    "operator_action"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "node_name": {"type": "string"},
+    "recommendation": {"enum": ["NONE", "REVIEW", "AVOID_MULTINODE", "INFERENCE_ONLY", "DRAIN_REVIEW", "QUARANTINE_REVIEW"]},
+    "severity": {"enum": ["INFO", "REVIEW", "WARNING", "CRITICAL"]},
+    "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+    "primary_reason": {"type": "string"},
+    "reason_codes": {"type": "string"},
+    "blockers": {"type": "string"},
+    "suggested_slurm_state": {"type": "string"},
+    "operator_action": {"type": "string"}
+  }
+}

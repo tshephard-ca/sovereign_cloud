@@ -1,0 +1,22 @@
+schema_version: 1
+name: application-uploads
+description: Application upload buckets where browser flows, metadata, tags, and read-after-write behavior often matter.
+workload_type: application_upload_bucket
+required_families:
+  - object_write
+  - object_read
+  - object_list
+severity_overrides:
+  TAGGING_ROUNDTRIP_FAILED: BLOCKER
+  METADATA_ROUNDTRIP_FAILED: BLOCKER
+  CORS_PREFLIGHT_MISMATCH: BLOCKER
+  PRESIGNED_URL_FAILED: BLOCKER
+required_hints:
+  - content_types
+  - metadata_headers
+  - cors
+evidence_quality_minimum: MEDIUM
+human_questions:
+  - Which metadata headers are read after upload?
+  - Which browser origins, methods, and headers must be supported?
+  - Are presigned URLs used for uploads or downloads?

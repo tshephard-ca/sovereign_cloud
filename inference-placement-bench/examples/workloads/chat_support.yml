@@ -1,0 +1,49 @@
+workload_id: chat_support
+display_name: Synthetic support chat workload
+workload_type: chat_text
+
+model:
+  declared_model_name: generic-chat-model
+  model_family: chat
+  min_context_window_tokens: 8192
+  expected_input_tokens_p50: 800
+  expected_input_tokens_p95: 1600
+  expected_output_tokens_p50: 200
+  expected_output_tokens_p95: 500
+  streaming_required: true
+
+benchmark:
+  prompt_file: examples/prompts/chat_support_prompts.jsonl
+  synthetic_prompt_count: 20
+  warmup_requests: 5
+  measured_requests: 50
+  concurrency: 1
+  request_timeout_seconds: 60
+  random_seed: 12345
+
+request:
+  method: POST
+  path: /v1/chat/completions
+  headers:
+    Content-Type: application/json
+  body_template:
+    model: "{{model_name}}"
+    messages:
+      - role: system
+        content: "You are a concise assistant."
+      - role: user
+        content: "{{prompt}}"
+    temperature: 0
+    max_tokens: "{{max_output_tokens}}"
+    stream: "{{streaming}}"
+
+response_extractors:
+  non_streaming:
+    text_json_path: "$.choices[0].message.content"
+    usage_input_tokens_json_path: "$.usage.prompt_tokens"
+    usage_output_tokens_json_path: "$.usage.completion_tokens"
+  streaming:
+    event_text_json_path: "$.choices[0].delta.content"
+    finish_reason_json_path: "$.choices[0].finish_reason"
+    usage_input_tokens_json_path: "$.usage.prompt_tokens"
+    usage_output_tokens_json_path: "$.usage.completion_tokens"

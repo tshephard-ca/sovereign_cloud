@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/cabinet-burst-envelope/envelope.schema.json",
+  "title": "Cabinet Burst Envelope",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "tool_version",
+    "cabinet_id",
+    "generated_at",
+    "window",
+    "envelope_status",
+    "confidence",
+    "limiting_factor",
+    "observed_power",
+    "observed_temperature",
+    "electrical",
+    "thermal",
+    "evidence_quality",
+    "review_lane",
+    "sales_ops_guardrail",
+    "reason_codes",
+    "blockers",
+    "warnings",
+    "missing_data",
+    "assumptions"
+  ],
+  "properties": {
+    "schema_version": {"const": "cabinet-burst-envelope.envelope.v1"},
+    "tool_version": {"type": "string"},
+    "cabinet_id": {"type": "string"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "window": {
+      "type": "object",
+      "required": ["start", "end", "days", "bucket_minutes"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"},
+        "days": {"type": "integer", "minimum": 1},
+        "bucket_minutes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "envelope_status": {"enum": ["READY_FOR_REVIEW", "REVIEW_REQUIRED", "DO_NOT_EXPAND", "INSUFFICIENT_DATA"]},
+    "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+    "recommended_sustained_kw": {"type": ["number", "null"], "minimum": 0},
+    "recommended_short_burst_kw": {"type": ["number", "null"], "minimum": 0},
+    "max_burst_duration_minutes": {"type": ["integer", "null"], "minimum": 0},
+    "trip_risk_threshold_kw": {"type": ["number", "null"]},
+    "thermal_risk_threshold_kw": {"type": ["number", "null"]},
+    "limiting_factor": {"enum": ["ELECTRICAL", "THERMAL", "BOTH", "DATA_QUALITY", "UNKNOWN"]},
+    "observed_power": {"type": "object"},
+    "observed_temperature": {"type": "object"},
+    "electrical": {"type": "object"},
+    "thermal": {"type": "object"},
+    "evidence_quality": {
+      "type": "object",
+      "required": ["score", "band", "coverage"],
+      "properties": {
+        "score": {"type": "integer", "minimum": 0, "maximum": 100},
+        "band": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+        "coverage": {"type": "object"}
+      }
+    },
+    "review_lane": {"type": "object"},
+    "sales_ops_guardrail": {
+      "type": "object",
+      "required": ["status", "text", "recommended_next_step"],
+      "properties": {
+        "status": {"enum": ["READY_FOR_REVIEW", "REVIEW_REQUIRED", "DO_NOT_EXPAND", "INSUFFICIENT_DATA"]},
+        "text": {"type": "string"},
+        "recommended_next_step": {"type": "string"}
+      }
+    },
+    "reason_codes": {"type": "array", "items": {"type": "string"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "missing_data": {"type": "array", "items": {"type": "string"}},
+    "assumptions": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

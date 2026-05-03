@@ -1,0 +1,18 @@
+schema_version: 1
+name: backup-archive
+description: Backup and archive buckets where multipart, restore, lifecycle, and retention review may matter.
+workload_type: backup_archive
+required_families:
+  - object_write
+  - object_read
+  - object_list
+severity_overrides:
+  MULTIPART_CREATE_FAILED: BLOCKER
+  MULTIPART_UPLOAD_FAILED: BLOCKER
+  MULTIPART_COMPLETE_FAILED: BLOCKER
+  LIFECYCLE_NOT_TESTED: REVIEW
+required_hints: []
+evidence_quality_minimum: MEDIUM
+human_questions:
+  - Are lifecycle transitions or expirations operationally required?
+  - Are multipart upload sizes and retry behavior known?

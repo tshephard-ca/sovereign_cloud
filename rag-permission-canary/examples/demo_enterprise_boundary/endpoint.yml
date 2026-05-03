@@ -1,0 +1,22 @@
+endpoint_id: local_demo_endpoint
+base_url: http://127.0.0.1:8000
+local_test_only: true
+request:
+  method: POST
+  path: /query
+  headers:
+    Content-Type: application/json
+  body_template:
+    query: '{{query}}'
+    user_id: '{{user_id}}'
+    test_case_id: '{{test_case_id}}'
+auth:
+  user_auth_from_test_user: true
+response_extractors:
+  answer_text_json_path: $.answer
+  citations_json_path: $.citations
+  citation_doc_id_json_path: $.doc_id
+  citation_title_json_path: $.title
+  citation_snippet_json_path: $.snippet
+  metadata_json_path: $.metadata
+  raw_context_json_path: $.retrieved_context

@@ -1,0 +1,491 @@
+# dr-prereq-lint demo: business stories, personas, ROI, and evidence
+
+Generated from local repo review, deterministic generated data, example analysis, benchmark analysis, and web research on 2026-05-01.
+
+Local subdirectory reviewed: `dr-prereq-lint`
+
+## Executive thesis
+
+`dr-prereq-lint` is best positioned as a disaster-recovery preflight control, not a backup verifier and not a generic report generator. It answers a narrow but expensive question:
+
+> Do protected systems appear to reference infrastructure prerequisites that are absent from the declared recovery set?
+
+That question has real business value because recovery exercises and actual disaster recovery often fail before application validation begins. A workload can be backed up and still fail to recover if DNS resolvers, directory services, Kerberos/KDC, global catalog, file shares, database hosts, license servers, time services, VPN/remote access, or other shared prerequisites are missing from the recovery runbook or isolated recovery environment.
+
+The product's core value is the gap between "we have backups" and "the recovered system can actually start, authenticate, resolve names, find dependencies, and operate enough to validate business service recovery."
+
+## External DR and resilience context
+
+The web research supports the repo's problem framing:
+
+- NIST SP 800-34 Rev. 1 describes contingency planning as a coordinated strategy of plans, procedures, and technical measures that enable recovery of information systems, operations, and data after a disruption. It emphasizes evaluating systems and operations to determine contingency requirements and priorities. Source: https://csrc.nist.gov/pubs/sp/800/34/r1/final
+- NIST's contingency planning topic page describes recovery using alternate equipment, alternate processing, alternate locations, and contingency controls based on system impact level. Source: https://csrc.nist.gov/topics/security-and-privacy/security-programs-and-operations/contingency-planning
+- NIST SP 800-61r3, finalized in April 2025, frames incident response as part of cybersecurity risk management and says the goal is to reduce incident impact and improve detection, response, and recovery effectiveness. Source: https://www.nist.gov/news-events/news/2025/04/nist-revises-sp-800-61-incident-response-recommendations-and-considerations
+- CISA's StopRansomware guide recommends maintaining offline encrypted backups and regularly testing backup availability and integrity in a disaster recovery scenario. It also says recovery should reconnect systems and restore data based on prioritization of critical services. Source: https://www.cisa.gov/stopransomware/ransomware-guide
+- Uptime Institute's 2024 outage analysis reports that 54% of respondents' most recent significant, serious, or severe outage cost more than $100,000, and 16% cost more than $1 million. It also reports network-related issues as the largest single cause of IT service outages and notes that many outages could be prevented with better management, processes, and configuration. Source: https://intelligence.uptimeinstitute.com/resource/annual-outage-analysis-2024
+
+The realistic ROI claim is therefore not "this guarantees recovery." It is "this reduces wasted DR-test windows, reduces hidden dependency misses, improves recovery-set completeness, and lets teams fix prerequisite gaps before a live recovery or expensive exercise."
+
+## What the local repo actually contains
+
+The README states that `dr-prereq-lint` is a local-only linter that compares a declared recovery set from backup inventory CSV against observed DNS lookup evidence from protected systems in a normalized DNS query log CSV. It emits `findings.csv`, `observed_prereqs.csv`, `summary.json`, reason codes, and human follow-up questions.
+
+It explicitly does not verify backups, boot systems, orchestrate recovery, scan networks, query directory services, connect to DNS servers, parse raw DNS server logs in the MVP, build application relationship maps, or prove readiness.
+
+Key local artifacts reviewed:
+
+- `README.md`: product scope, input schema, resolver hints, known prerequisite rules, offline answer map, policy packs, human outputs, and limitations.
+- `src/dr_prereq_lint/models.py`: typed models for backup inventory rows, protected systems, DNS query rows, resolver hints, known prerequisite rules, observations, findings, and summary output.
+- `src/dr_prereq_lint/lint_rules.py`: pipeline orchestration, client mapping, DNS window filtering, resolver evidence, known prerequisites, recovery-set matching, finding generation, evidence quality, business context, and window comparison.
+- `src/dr_prereq_lint/classify_queries.py`: DNS query classification into prerequisite categories, including directory, Kerberos, global catalog, database, file, license, VPN, time, and other prerequisites.
+- `src/dr_prereq_lint/classify_prereqs.py`: aggregation of query-level evidence into deduplicated observed prerequisites.
+- `src/dr_prereq_lint/recovery_set.py`: recovery-set construction and role-tag matching for directory/Kerberos/global catalog services.
+- `src/dr_prereq_lint/config.py`: default thresholds and policy-pack overlay support.
+- `src/dr_prereq_lint/human_reports.py`: markdown report, handoff questions, checklist, redacted evidence bundle.
+- `src/dr_prereq_lint/generate_data.py`: deterministic sample and benchmark data generation.
+
+## Generated input deep dive
+
+I generated all 17 deterministic sample scenarios using the repo's generator into `/tmp/dr-prereq-lint-demo-generated/samples/`. I also generated a benchmark dataset into `/tmp/dr-prereq-lint-demo-generated/benchmark_fail_120x5000`.
+
+Generated sample scenarios:
+
+- `pass-minimal`
+- `missing-dns-resolver`
+- `missing-directory-service`
+- `missing-kerberos`
+- `missing-global-catalog`
+- `missing-database-host`
+- `missing-file-share`
+- `missing-license-server`
+- `weak-vpn-signal`
+- `external-ignored`
+- `external-included`
+- `unmapped-clients`
+- `missing-answer-data`
+- `role-tags-satisfy-directory`
+- `multi-application-shared-prereq`
+- `timestamp-windowing`
+- `redaction-demo`
+
+Each generated sample creates:
+
+- `backup_inventory.csv`
+- `dns_queries.csv`
+- `answer_map.csv`
+- `owner_map.csv`
+- `accepted_risks.yml`
+- `recovery_sets.yml`
+- `known_prereqs.yml`
+- `resolver_hints.yml`
+- `thresholds.yml`
+- `expected_findings.csv`
+- `expected_observed_prereqs.csv`
+- `expected_summary.json`
+- an accuracy report
+
+The generated base inventory includes:
+
+- `app01` and `app02` as protected applications in `dr-test-001`.
+- `dns01` as DNS resolver.
+- `dc01` as directory service, Kerberos, and global catalog host.
+- `sql01` as database host.
+- `files01` as file service.
+- `license01` as license service.
+- `vpn01` as remote access prerequisite.
+- `coordinator01` as other prerequisite.
+
+The generated DNS evidence includes:
+
+- SRV lookups for directory, Kerberos, and global catalog.
+- A lookups for database, file share, license, VPN, time, and other prerequisites.
+- Optional external queries.
+- Missing answer-data cases.
+- Unmapped-client cases.
+- Timestamp-windowing cases.
+- Multi-application shared prerequisite cases.
+
+The generated benchmark input is more realistic:
+
+- 120 protected systems out of 121 inventory rows.
+- 4,997 DNS rows after intentionally malformed rows are filtered.
+- 1,071 DNS rows inside the 24-hour default window.
+- 115 systems in the recovery set.
+- 147 mapped DNS clients.
+- 15 unmapped DNS clients.
+- Mixed qtypes: A, AAAA, CNAME, HTTPS, MX, NS, PTR, SOA, SRV, TXT, and unsupported.
+- Mixed rcodes: NOERROR, NXDOMAIN, SERVFAIL.
+- Input quality edge cases: stale inventory row, duplicate FQDN, duplicate IP, conflicting aliases, multi-IP rows, IPv6, missing resolver identity, name-only clients, IP-only clients, unmapped clients, missing answer data, and offline answer-map enrichment.
+
+This generated input is credible because real DR data is messy. It does not assume a perfect CMDB, perfect DNS logs, perfect client mapping, or a clean inventory. That makes the business stories more realistic.
+
+## Code deep dive
+
+### 1. The tool is intentionally narrow
+
+The README's central question is exactly scoped: do protected systems reference prerequisites absent from the declared recovery set? This makes the tool defensible because it does not claim to prove recovery or build a full dependency map.
+
+### 2. It uses passive evidence
+
+The tool uses backup inventory and normalized DNS logs. It does not scan, query DNS live, bind to directory services, call backup APIs, ping, port scan, capture packets, or invoke external services. That matters for regulated and production environments where live probing during assessment can create risk.
+
+### 3. It maps DNS clients back to protected systems
+
+`ClientMapper` maps query clients by IP, FQDN, short name, and aliases. This is important because the same prerequisite query means more when it came from a protected workload in scope.
+
+### 4. It classifies DNS evidence into DR prerequisite categories
+
+`classify_queries.py` recognizes:
+
+- DNS resolvers from resolver hints or DNS log resolver identity.
+- Directory service from LDAP/MSDCS SRV lookups.
+- Kerberos/KDC from Kerberos SRV lookups.
+- Global catalog from GC SRV lookups.
+- Database and file service SRV lookups.
+- Database, file, license, VPN, and time services from deterministic known-prereq rules and conservative heuristics.
+
+### 5. It distinguishes high-confidence rules from weak heuristics
+
+Known prerequisites override keyword heuristics. Heuristic-only findings are marked as review signals. Missing answer data is surfaced rather than hidden.
+
+### 6. It matches observed prerequisites back to the declared recovery set
+
+`match_recovery_set` attempts IP match, hostname match, short-name match, alias match, and role-tag match. This matters because infrastructure teams often represent the same dependency differently in inventory, DNS, and recovery plans.
+
+### 7. It uses severity carefully
+
+Default config makes missing DNS resolver, directory service, Kerberos, global catalog, and specific missing targets critical. Known prerequisite missing is warning by default, but high-volume, multi-client observations for database, file share, license server, or VPN can become critical.
+
+### 8. It records evidence quality
+
+The summary reports answer-name coverage, answer-IP coverage, DNS window coverage, mapped-client percentage, timestamp parse percentage, qtype count, rcode count, input audit issues, stale inventory rows, duplicate FQDNs, duplicate IPs, and conflicting aliases.
+
+### 9. It creates human-operational outputs
+
+The repo can produce a markdown preflight report, handoff questions grouped by audience, prerequisite checklist, redacted evidence bundle, validation report, schema metadata, and recovery-set comparisons.
+
+### 10. It supports benchmark and sample data
+
+The deterministic generator is product-important. It makes demos repeatable, proves behavior across cases, and gives engineering a regression surface for future policy packs and adapters.
+
+## Generated output deep dive
+
+### Static example run
+
+I ran the example data through the CLI. It returned `lint status: FAIL` with warning `UNMAPPED_DNS_CLIENT`.
+
+Example summary:
+
+- Backup inventory rows: 6.
+- DNS log rows: 8.
+- Recovery-set systems: 2.
+- Mapped DNS clients: 2.
+- Unmapped DNS clients: 1.
+- Findings: 6 critical, 2 warning, 0 review, 0 info.
+- Top missing prerequisites: `sql01.apps.example.internal`, `dc01.corp.example.internal`, `dns01.example.internal`, `dns02.example.internal`, `File services`.
+- Evidence quality: PARTIAL because some DNS clients did not map to protected systems.
+
+The example is intentionally stark: only `app01` and `app02` are in `dr-test-001`, but DNS evidence shows they depend on directory/Kerberos/global catalog, SQL, file services, license service, and DNS resolvers that are not in the recovery set.
+
+### Generated sample scenario output
+
+Across the 17 generated scenarios:
+
+- Total findings: 132.
+- Severity distribution: 114 INFO, 4 REVIEW, 11 CRITICAL, 3 WARNING.
+- Finding codes: 115 `TARGET_PRESENT_IN_RECOVERY_SET`, 16 `SPECIFIC_TARGET_NOT_IN_RECOVERY_SET`, 1 `DNS_RESOLVER_NOT_IN_RECOVERY_SET`.
+- Category coverage:
+  - database_host: 17
+  - directory_service: 17
+  - dns_resolver: 17
+  - file_share: 16
+  - global_catalog: 16
+  - kerberos_service: 16
+  - license_server: 16
+  - vpn_endpoint: 17
+
+Important sample behavior:
+
+- `missing-dns-resolver` produces FAIL with one critical DNS resolver finding.
+- `missing-directory-service`, `missing-kerberos`, and `missing-global-catalog` each produce FAIL with three critical identity findings because the same `dc01` host satisfies directory, Kerberos, and global catalog evidence.
+- `missing-database-host` produces REVIEW for `sql01.apps.example.internal`.
+- `multi-application-shared-prereq` produces FAIL because SQL is observed from two protected systems.
+- `missing-file-share` and `missing-license-server` produce WARNING under the small sample because query volume and client count are low.
+- `weak-vpn-signal` produces WARNING for remote access because it is known but low-volume.
+- `missing-answer-data` produces REVIEW because evidence is partial.
+- `unmapped-clients` produces REVIEW and `UNMAPPED_DNS_CLIENT`.
+- `external-ignored` passes because external evidence is excluded by default.
+- `external-included` produces REVIEW for `portal.external.test`.
+- `timestamp-windowing` passes because the older missing dependency is outside the default window.
+
+### Generated benchmark output
+
+The benchmark fail scenario is the strongest demo artifact:
+
+- Lint status: FAIL.
+- Backup inventory rows: 121.
+- Protected systems: 120.
+- Recovery-set systems: 115.
+- DNS rows: 4,997.
+- DNS rows in default window: 1,071.
+- Mapped DNS clients: 147.
+- Unmapped DNS clients: 15.
+- Findings: 3 critical, 1 warning, 0 review, 7 info.
+- Top missing prerequisites: File services, License service, Remote access portal, Batch coordinator.
+
+Critical benchmark findings:
+
+- File services missing: 38 observed queries, 29 protected systems.
+- License service missing: 22 observed queries, 20 protected systems.
+- Remote access portal missing: 10 observed queries, 9 protected systems.
+
+Warning:
+
+- Batch coordinator missing: 8 observed queries, 8 protected systems.
+
+Evidence quality was PARTIAL, not perfect, which is realistic. It reported:
+
+- Some DNS clients did not map to protected systems.
+- Offline answer map enriched 618 DNS rows.
+- Backup inventory contained non-protected/stale rows.
+- Duplicate FQDN values.
+- Duplicate IP values.
+- Conflicting aliases.
+- Answer-name coverage: 65.92%.
+- Answer-IP coverage: 64.99%.
+- Window coverage: 21.43%.
+- Mapped-client identity: 90.74%.
+- Timestamp parse: 100%.
+
+Business context from the benchmark:
+
+- Protected systems by owner team: application-team 25, network-team 20, database-team 19, platform-team 19, storage-team 19, identity-team 18.
+- Protected systems by site: primary 50, lab 35, secondary 35.
+- Protected systems by environment: prod 50, dev 35, test 35.
+- Impacted examples by owner team: application-team 21, storage-team 12, identity-team 11, platform-team 10, database-team 7, network-team 5.
+- Impacted examples by site: primary 33, secondary 21, lab 12.
+- Impacted examples by environment: prod 33, test 21, dev 12.
+
+This benchmark makes the business case: the tool can identify a small number of missing shared prerequisites that may affect dozens of systems and multiple owner teams.
+
+## Personas
+
+| Persona | Role in the story | What they need from the tool |
+|---|---|---|
+| DR program manager | Owns recovery exercise readiness and schedule | Preflight pass/fail, top missing prerequisites, test-blocking gaps |
+| Recovery engineer | Builds and validates the recovery set | Findings, observed prerequisites, match basis, missing data |
+| Backup administrator | Owns protected-system inventory and recovery-set inclusion | Which backed-up systems are included or excluded |
+| DNS/network engineer | Owns resolver availability and DNS evidence | Resolver prerequisites, DNS query evidence, unmapped clients |
+| Identity services lead | Owns directory, Kerberos, global catalog | SRV evidence, role-tag sufficiency, critical identity gaps |
+| Database administrator | Owns recovered database availability | Missing DB targets, multi-client query evidence |
+| Storage/file services lead | Owns shares, NAS, SMB/NFS services | Missing file service findings, impacted systems |
+| License/service owner | Owns license services and app startup prerequisites | Missing license server warnings/critical findings |
+| Remote-access/network security lead | Owns VPN and admin access during recovery | VPN endpoint findings and whether remote access is required |
+| Application owner | Owns business validation after recovery | Questions about actual app prerequisites and accepted risk |
+| GRC/risk manager | Owns evidence, accepted risk, audit, and policy | Redacted bundle, accepted risks, reason codes, evidence quality |
+| Executive sponsor | Owns business-risk and exercise ROI | Reduced wasted DR tests, outage-cost avoidance, readiness trend |
+
+## Top business stories
+
+### Story 1: Avoid a failed DR test before application validation starts
+
+Personas: DR program manager, recovery engineer, backup administrator, executive sponsor.
+
+Story: The DR program manager schedules a recovery test for `dr-test-001`. The backup administrator supplies the protected-system inventory. The recovery engineer supplies DNS query logs from production systems. Before the test window, `dr-prereq-lint` shows that the declared recovery set contains the app systems but excludes prerequisites those apps clearly look up.
+
+Evidence: The static example returns FAIL with 6 critical findings and 2 warnings. Only 2 systems are in the recovery set, while DNS evidence shows missing SQL, directory/Kerberos/global catalog, DNS resolvers, file services, and license service.
+
+ROI: Avoiding one wasted DR exercise can save engineering labor, change-window cost, business stakeholder time, and executive confidence. The tool does not need to recover anything to create value; it needs to prevent a predictable failure from consuming the recovery window.
+
+Why credible: The findings are based on passive DNS evidence and explicit recovery-set membership, not invented topology.
+
+### Story 2: Catch missing DNS resolvers before the recovered environment is blind
+
+Personas: DNS/network engineer, recovery engineer, DR program manager, executive sponsor.
+
+Story: The recovery set includes applications, but the resolver hints say `dns01` and `dns02` are required. The recovery plan excludes the DNS resolver. The DNS/network engineer learns before the exercise that the recovered systems may not resolve the names needed for startup.
+
+Evidence: `missing-dns-resolver` produces FAIL with `DNS_RESOLVER_NOT_IN_RECOVERY_SET`. The static example finds both `dns01.example.internal` and `dns02.example.internal` absent. The README explicitly states resolver identity matters because recovery systems need DNS resolvers in the recovery network.
+
+ROI: DNS failure can make every other recovered dependency look broken. Catching it before test execution prevents broad false failures and shortens troubleshooting.
+
+Why credible: Resolver evidence comes from explicit resolver hints or DNS log resolver identity. No live DNS query is performed.
+
+### Story 3: Avoid identity-service collapse in an isolated recovery lab
+
+Personas: identity services lead, application owner, recovery engineer, DR program manager, GRC/risk manager.
+
+Story: Application owners assume that restoring app VMs is enough. DNS SRV lookups show applications depend on LDAP, Kerberos/KDC, and global catalog. The identity services lead sees that `dc01` is excluded from the recovery set. The DR manager now has a concrete blocker before the recovery lab is built.
+
+Evidence: `missing-directory-service`, `missing-kerberos`, and `missing-global-catalog` each produce FAIL with 3 critical findings tied to `dc01.corp.example.internal`. The code classifies `_ldap`, `_kerberos`, and `_gc` SRV lookups into directory, Kerberos, and global catalog categories.
+
+ROI: Identity failures often prevent app login, service startup, policy application, and admin access. Finding this before the test can protect the entire exercise.
+
+Why credible: The code does not rely on generic hostname guessing here. SRV records are strong evidence of directory/Kerberos/global catalog dependency.
+
+### Story 4: Discover shared database dependencies that app owners did not declare
+
+Personas: application owner, database administrator, recovery engineer, DR program manager.
+
+Story: Two protected applications query `sql01`, but the database host is outside the recovery set. The database administrator and application owners can now decide whether SQL must be recovered with the app, provided by another recovery process, or documented as an accepted dependency.
+
+Evidence: The static example marks `sql01.apps.example.internal` critical because two protected systems query it. `multi-application-shared-prereq` produces FAIL for SQL observed from two protected systems. In generated output, multi-client evidence upgrades credibility.
+
+ROI: Without the database, application recovery validation may fail after compute restoration appears successful. Catching a shared missing database avoids late-stage test failure and cross-team blame.
+
+Why credible: The finding includes observed query count, observed protected-system count, example qnames, answer IPs, and source rows.
+
+### Story 5: Prevent dozens of recovered systems from failing on a missing file service
+
+Personas: storage/file services lead, application owner, recovery engineer, executive sponsor.
+
+Story: In the benchmark, many applications depend on file services. The storage lead may not have been included in the recovery-set planning meeting because the app teams focused on VMs and databases. The linter shows file services are a critical missing shared prerequisite.
+
+Evidence: Benchmark output marks File services CRITICAL: 38 observed queries across 29 protected systems. It asks whether the file service is restored as a VM, appliance, NAS, or separate storage service.
+
+ROI: A single missing file share can break many apps at startup, configuration load, export/import, report generation, or user workflow. The ROI is high because one shared fix can protect many recovered systems.
+
+Why credible: The benchmark models multi-team, multi-site, multi-environment dependencies and identifies the file service through known-prereq and SRV evidence.
+
+### Story 6: Expose license-server dependency before restored apps refuse to run
+
+Personas: license/service owner, application owner, procurement/vendor manager, recovery engineer.
+
+Story: Applications can boot but fail when they cannot reach a license service. This is common enough to matter and often owned outside the core recovery team. The linter finds the license service before the recovery test.
+
+Evidence: `missing-license-server` produces WARNING in the small sample. In the benchmark, License service is CRITICAL: 22 observed queries across 20 protected systems.
+
+ROI: License-service failures can create a deceptive recovery state: the VM is restored, but the app is unusable. Avoiding this can preserve the validation window and prevent emergency vendor/procurement escalation.
+
+Why credible: Severity scales with evidence volume and number of protected systems. Low-volume evidence remains warning; high-volume multi-client evidence can become critical.
+
+### Story 7: Decide whether remote access belongs inside the recovery scenario
+
+Personas: remote-access/network security lead, DR program manager, recovery engineer, security lead.
+
+Story: The recovery team needs to know whether VPN/remote access is required during the test or only in production. If operators cannot reach the isolated recovery environment, recovery stalls. If VPN is not required, the dependency can be accepted or excluded deliberately.
+
+Evidence: `weak-vpn-signal` produces a warning. The benchmark marks Remote access portal CRITICAL: 10 observed queries across 9 protected systems.
+
+ROI: Remote-access gaps can block the people needed to operate the recovery. Conversely, unnecessary remote-access restoration can widen the test scope. The value is explicit decision-making.
+
+Why credible: The output asks the right human question: is remote-access infrastructure required during this recovery scenario, or only for normal production access?
+
+### Story 8: Use evidence quality to avoid false confidence
+
+Personas: GRC/risk manager, backup administrator, DNS/network engineer, recovery engineer.
+
+Story: The DR manager asks, "Can we trust this preflight?" The summary says evidence is PARTIAL because some clients do not map, answer coverage is incomplete, and inventory has duplicate FQDN/IP/alias issues. Instead of hiding data quality problems, the tool makes them visible.
+
+Evidence: Benchmark evidence quality reports unmapped DNS clients, 618 answer-map-enriched rows, duplicate FQDN, duplicate IP, conflicting aliases, answer-name coverage 65.92%, answer-IP coverage 64.99%, and mapped-client identity 90.74%.
+
+ROI: Data-quality visibility prevents overconfidence and directs cleanup to the highest-value input improvements. Better inventory and DNS evidence improve every future recovery exercise.
+
+Why credible: The summary treats evidence quality as first-class output, not an appendix.
+
+### Story 9: Separate external dependency review from internal recovery scope
+
+Personas: application owner, GRC/risk manager, vendor/procurement manager, recovery engineer.
+
+Story: An app queries an external portal. The recovery team needs to decide whether that is in scope, an accepted risk, or a vendor dependency. By default, external queries are ignored; with external inclusion enabled, the tool emits a review finding.
+
+Evidence: `external-ignored` passes. `external-included` returns REVIEW for `portal.external.test`.
+
+ROI: This avoids two common mistakes: bloating the recovery set with every external dependency, or ignoring a dependency that must be documented for business validation.
+
+Why credible: The behavior is explicit and policy-driven. External evidence is not silently treated as an internal blocker.
+
+### Story 10: Find periodic dependencies with window comparison
+
+Personas: application owner, recovery engineer, DR program manager, database administrator.
+
+Story: A dependency may appear only in weekly batch, monthly close, startup, or maintenance windows. A 24-hour DNS window can miss it. Window comparison helps the team choose a defensible observation period.
+
+Evidence: `timestamp-windowing` shows older dependency evidence outside the default window. The CLI supports multiple `--compare-window-hours` values and summarizes new, persisting, and no-longer-seen missing prerequisites.
+
+ROI: Periodic dependencies are expensive to discover during a live DR test because they may fail late, after the initial "it works" conclusion. Longer-window preflight can catch them.
+
+Why credible: The tool warns that a 24-hour window may miss periodic dependencies, and the code supports window comparison.
+
+### Story 11: Turn findings into role-specific handoff questions
+
+Personas: DR program manager, DNS/network engineer, identity services lead, database administrator, storage lead, application owner.
+
+Story: The output is not just a CSV. It turns findings into human questions: Which DNS resolvers will be available? Which domain controllers start first? Is SQL restored with the app? Is the file service a VM, NAS, or separate service? Will the license server be reachable?
+
+Evidence: `human_reports.py` groups questions by audience and writes a preflight report/checklist. `lint_rules.py` has category-specific suggested questions.
+
+ROI: Recovery planning fails when the right question never reaches the right owner. This reduces meeting time and makes remediation actionable.
+
+Why credible: The questions are attached to finding categories and evidence, not generic consulting text.
+
+### Story 12: Share evidence safely with stakeholders
+
+Personas: GRC/risk manager, security lead, partner/consultant, executive sponsor.
+
+Story: The organization wants help reviewing recovery gaps but cannot expose internal hostnames and IPs. The tool can redact outputs and create an evidence bundle while preserving reason codes and structure.
+
+Evidence: `redact.py` tokenizes protected systems and prerequisites and redacts private/public IP shapes. `human_reports.py` supports redacted evidence bundles.
+
+ROI: Redaction lowers friction for external review, executive reporting, and cross-team escalation without leaking sensitive infrastructure details.
+
+Why credible: The redaction is deterministic enough for one run and preserves the evidence model.
+
+## Why these stories are realistic
+
+- The repo does not assume backup success equals recovery success.
+- It uses passive data that organizations can export without credentials or live probing.
+- It treats DNS as evidence of lookup behavior, not proof of successful connections.
+- It has explicit caveats for DNS caching, missing answer data, weak keyword heuristics, unmapped clients, and limited observation windows.
+- It separates PASS, REVIEW, and FAIL states.
+- It generates role-specific follow-up questions instead of pretending to automatically fix gaps.
+- It scales from small deterministic scenarios to larger benchmark data.
+
+## Highest-value ROI cases
+
+1. Prevent a wasted DR exercise.
+   A single failed recovery test can consume many people across infrastructure, application, business, and risk teams. Preflight findings can stop a predictable failure before the test window.
+
+2. Prevent live recovery delay.
+   During a real outage or ransomware recovery, missing DNS, identity, file, database, license, and remote-access prerequisites can stretch RTO. Pre-identifying them directly supports faster recovery.
+
+3. Reduce cross-team blame and triage time.
+   Findings include evidence, source rows, observed protected systems, query counts, and human questions. This gives teams a shared fact base.
+
+4. Improve recovery-set design over time.
+   Repeated runs can reveal persistent missing shared services, weak inventory quality, missing owners, and role-tag gaps.
+
+5. Make accepted risk explicit.
+   External or out-of-scope dependencies can be documented instead of rediscovered during every test.
+
+## What this can become as core technology
+
+The strongest product direction is a recovery dependency evidence layer:
+
+- Inputs: backup inventory, DNS query logs, known prerequisite rules, resolver hints, offline answer maps, owner maps, accepted risks, recovery-set metadata.
+- Core: deterministic client mapping, prerequisite classification, recovery-set matching, evidence aggregation, severity, data-quality scoring, policy-pack overlays, window comparison.
+- Outputs: findings CSV, observed prerequisites CSV, summary JSON, preflight report, handoff questions, checklist, redacted evidence bundle, validation report, schema metadata.
+- Future integrations: backup catalog, CMDB/service catalog, DNS log pipelines, SIEM exports, DR orchestration tools, ticketing, GRC evidence systems, recovery-test management.
+
+The defensible core is not a report. It is the normalized evidence model and deterministic linting engine that turns messy operational evidence into preflight blockers and owner-specific questions.
+
+## Demo narrative
+
+Use this talk track:
+
+1. "Backups do not prove recoverability. Apps need DNS, identity, databases, file shares, licenses, time, and access paths."
+2. "Here is a declared recovery set from backup inventory."
+3. "Here is passive DNS evidence from protected systems."
+4. "The linter asks which prerequisites appear in DNS evidence but are absent from the recovery set."
+5. "In the example, the app VMs are in scope, but DNS, directory, Kerberos, global catalog, SQL, file, and license dependencies are missing."
+6. "In the larger benchmark, one missing file service affects 29 systems, one missing license service affects 20, and one missing remote-access endpoint affects 9."
+7. "The output gives severity, confidence, reason codes, missing data, example clients, and owner questions."
+8. "The business value is avoiding wasted recovery windows and fixing prerequisite gaps before the real event."
+
+## Bottom line
+
+The highest-value story is:
+
+"Before a DR test or live recovery, `dr-prereq-lint` uses passive DNS evidence and backup inventory to identify missing shared prerequisites that would cause recovered workloads to fail validation. It gives the DR manager, recovery engineer, backup admin, DNS/network lead, identity lead, DBA, storage lead, app owners, and GRC lead a concrete, evidence-backed preflight gap list."
+
+That story is credible and high ROI because it aligns with NIST contingency planning, CISA recovery testing guidance, NIST incident response/recovery guidance, and outage-cost data, while staying honest about limitations.

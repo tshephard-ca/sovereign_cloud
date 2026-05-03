@@ -1,0 +1,30 @@
+{
+  "event_id": "evt-2026-proto-001",
+  "started_at": "2026-01-01T00:00:00Z",
+  "observed_at": "2026-01-01T00:04:00Z",
+  "severity": "HIGH",
+  "attack_class": "PROTOCOL",
+  "mitigation_state": "ACTIVE",
+  "confidence": "HIGH",
+  "targets": [
+    {
+      "name": "sip_edge",
+      "ip": "203.0.113.30",
+      "protocol": "udp",
+      "ports": [5060, 5061],
+      "observed_bps": 120000000,
+      "observed_pps": 220000,
+      "baseline_bps": 20000000,
+      "baseline_pps": 12000
+    }
+  ],
+  "signals": {
+    "protocol_mix": {
+      "udp": 90
+    },
+    "spoofing_likely": false
+  },
+  "provider_actions_already_active": ["protocol_protection"],
+  "notes": ["Protocol sample event."]
+}
+

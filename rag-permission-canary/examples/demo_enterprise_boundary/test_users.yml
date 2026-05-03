@@ -1,0 +1,37 @@
+users:
+- user_id: user_hr
+  display_name: Hr Test User
+  auth:
+    type: none
+  groups:
+  - hr_readers
+  - public_readers
+  attributes:
+    department: hr
+- user_id: user_finance
+  display_name: Finance Test User
+  auth:
+    type: none
+  groups:
+  - finance_readers
+  - public_readers
+  attributes:
+    department: finance
+- user_id: user_legal
+  display_name: Legal Test User
+  auth:
+    type: none
+  groups:
+  - legal_readers
+  - public_readers
+  attributes:
+    department: legal
+- user_id: user_engineering
+  display_name: Engineering Test User
+  auth:
+    type: none
+  groups:
+  - engineering_readers
+  - public_readers
+  attributes:
+    department: engineering

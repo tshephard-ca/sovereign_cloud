@@ -1,0 +1,2 @@
+/dev/sdb1 /var/lib/postgresql xfs defaults 0 2
+

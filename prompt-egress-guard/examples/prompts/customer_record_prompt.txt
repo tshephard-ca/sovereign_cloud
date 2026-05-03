@@ -1,0 +1,7 @@
+Please draft a support response.
+
+customer_id: CUST-102030
+support ticket: TCK-100200
+Name: Taylor Example
+Email: taylor.example@example.invalid
+Account status: renewal pending

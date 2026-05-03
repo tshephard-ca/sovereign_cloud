@@ -1,0 +1,10 @@
+Can you review this source-code-like snippet?
+
+```ts
+import { runJob } from "./internal/queue";
+
+export function processOrder(orderId: string) {
+  // TODO BUG-1234: remove temporary retry behavior
+  return runJob({ orderId, env: "prod" });
+}
+```

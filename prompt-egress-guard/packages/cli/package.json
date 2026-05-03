@@ -1,0 +1,20 @@
+{
+  "name": "@prompt-egress-guard/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "prompt-egress-guard": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@prompt-egress-guard/core": "0.1.0",
+    "@prompt-egress-guard/extension": "0.1.0",
+    "esbuild": "^0.21.5",
+    "js-yaml": "^4.1.0"
+  }
+}

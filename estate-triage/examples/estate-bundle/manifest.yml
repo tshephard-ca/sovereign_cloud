@@ -1,0 +1,25 @@
+bundle_version: 1.0.0
+assessment_id: synthetic-local-assessment
+inputs:
+  - path: inputs/inventory.csv
+    kind: inventory
+    mapping: mappings/inventory-map.yml
+  - path: inputs/backup_export.csv
+    kind: backup
+    mapping: mappings/backup-map.yml
+  - path: inputs/utilization.csv
+    kind: utilization
+    mapping: mappings/utilization-map.yml
+policy:
+  thresholds: policies/thresholds.yml
+privacy:
+  redaction_mode: strict
+  hash_salt_file: .local-salt
+outputs:
+  directory: outputs
+  top_csv: top.csv
+  summary_json: summary.json
+  assessment_json: assessment.json
+  validation_json: validation.json
+  fingerprints_json: input-fingerprints.json
+feedback: feedback/feedback.yml

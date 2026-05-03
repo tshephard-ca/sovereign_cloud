@@ -1,0 +1,220 @@
+pack_id: simple_hr_finance_canary_pack
+generated_at: '2026-01-01T00:00:00Z'
+content_set_id: simple_hr_finance_canary
+users:
+- user_finance
+- user_hr
+test_users:
+- user_id: user_finance
+  display_name: Finance Test User
+  auth:
+    type: bearer_env
+    token_env: RAG_CANARY_USER_FINANCE_TOKEN
+    header_name: Authorization
+    header_value_env: ''
+  groups:
+  - finance_readers
+  - public_readers
+  attributes:
+    department: finance
+- user_id: user_hr
+  display_name: HR Test User
+  auth:
+    type: bearer_env
+    token_env: RAG_CANARY_USER_HR_TOKEN
+    header_name: Authorization
+    header_value_env: ''
+  groups:
+  - hr_readers
+  - public_readers
+  attributes:
+    department: hr
+test_cases:
+- test_case_id: tc_001
+  user_id: user_finance
+  query: What document mentions CANARY_FINANCE_BRAVO?
+  expected_result: ALLOWED
+  target_doc_id: doc_fin_001
+  target_canary_ids:
+  - canary_finance_bravo
+  target_canary_texts:
+  - CANARY_FINANCE_BRAVO
+  forbidden_doc_ids:
+  - doc_hr_001
+  allowed_doc_ids:
+  - doc_fin_001
+  - doc_public_001
+  leakage_checks:
+    forbidden_canary_texts:
+    - CANARY_HR_ALPHA
+    - HR-EAP-2026
+    forbidden_doc_titles:
+    - HR Benefits Plan 2026
+    forbidden_metadata_values:
+    - hr
+    - benefits
+    - example-region
+    - internal
+    forbidden_phrases:
+    - The HR benefits plan includes CANARY_HR_ALPHA.
+  reason_codes:
+  - ALLOWED_QUERY_GENERATED
+  - EXACT_CANARY_CHECK_CONFIGURED
+- test_case_id: tc_002
+  user_id: user_finance
+  query: Summarize the restricted hr document.
+  expected_result: FORBIDDEN
+  target_doc_id: doc_hr_001
+  target_canary_ids:
+  - canary_hr_alpha
+  - canary_hr_eap_code
+  target_canary_texts:
+  - CANARY_HR_ALPHA
+  - HR-EAP-2026
+  forbidden_doc_ids:
+  - doc_hr_001
+  allowed_doc_ids:
+  - doc_fin_001
+  - doc_public_001
+  leakage_checks:
+    forbidden_canary_texts:
+    - CANARY_HR_ALPHA
+    - HR-EAP-2026
+    forbidden_doc_titles:
+    - HR Benefits Plan 2026
+    forbidden_metadata_values:
+    - hr
+    - benefits
+    - example-region
+    - internal
+    forbidden_phrases:
+    - The HR benefits plan includes CANARY_HR_ALPHA.
+  reason_codes:
+  - FORBIDDEN_QUERY_GENERATED
+  - FORBIDDEN_TOKEN_OMITTED_FROM_QUERY
+  - EXACT_CANARY_CHECK_CONFIGURED
+- test_case_id: tc_003
+  user_id: user_hr
+  query: Summarize HR Benefits Plan 2026.
+  expected_result: ALLOWED
+  target_doc_id: doc_hr_001
+  target_canary_ids:
+  - canary_hr_alpha
+  target_canary_texts:
+  - CANARY_HR_ALPHA
+  forbidden_doc_ids:
+  - doc_fin_001
+  allowed_doc_ids:
+  - doc_hr_001
+  - doc_public_001
+  leakage_checks:
+    forbidden_canary_texts:
+    - CANARY_FINANCE_BRAVO
+    - MARGIN-SCENARIO-42
+    forbidden_doc_titles:
+    - Finance Forecast Draft
+    forbidden_metadata_values:
+    - finance
+    - forecast
+    - example-region
+    - restricted
+    forbidden_phrases:
+    - The finance forecast draft includes CANARY_FINANCE_BRAVO.
+  reason_codes:
+  - ALLOWED_QUERY_GENERATED
+  - EXACT_CANARY_CHECK_CONFIGURED
+- test_case_id: tc_004
+  user_id: user_hr
+  query: What does Finance Forecast Draft say?
+  expected_result: FORBIDDEN
+  target_doc_id: doc_fin_001
+  target_canary_ids:
+  - canary_finance_bravo
+  - canary_margin_scenario
+  target_canary_texts:
+  - CANARY_FINANCE_BRAVO
+  - MARGIN-SCENARIO-42
+  forbidden_doc_ids:
+  - doc_fin_001
+  allowed_doc_ids:
+  - doc_hr_001
+  - doc_public_001
+  leakage_checks:
+    forbidden_canary_texts:
+    - CANARY_FINANCE_BRAVO
+    - MARGIN-SCENARIO-42
+    forbidden_doc_titles:
+    - Finance Forecast Draft
+    forbidden_metadata_values:
+    - finance
+    - forecast
+    - example-region
+    - restricted
+    forbidden_phrases:
+    - The finance forecast draft includes CANARY_FINANCE_BRAVO.
+  reason_codes:
+  - FORBIDDEN_QUERY_GENERATED
+  - FORBIDDEN_TOKEN_OMITTED_FROM_QUERY
+  - EXACT_CANARY_CHECK_CONFIGURED
+- test_case_id: tc_005
+  user_id: user_finance
+  query: Summarize the content containing CANARY_PUBLIC_CHARLIE.
+  expected_result: ALLOWED
+  target_doc_id: doc_public_001
+  target_canary_ids:
+  - canary_public_charlie
+  target_canary_texts:
+  - CANARY_PUBLIC_CHARLIE
+  forbidden_doc_ids:
+  - doc_hr_001
+  allowed_doc_ids:
+  - doc_fin_001
+  - doc_public_001
+  leakage_checks:
+    forbidden_canary_texts:
+    - CANARY_HR_ALPHA
+    - HR-EAP-2026
+    forbidden_doc_titles:
+    - HR Benefits Plan 2026
+    forbidden_metadata_values:
+    - hr
+    - benefits
+    - example-region
+    - internal
+    forbidden_phrases:
+    - The HR benefits plan includes CANARY_HR_ALPHA.
+  reason_codes:
+  - ALLOWED_QUERY_GENERATED
+  - EXACT_CANARY_CHECK_CONFIGURED
+- test_case_id: tc_006
+  user_id: user_hr
+  query: What are the key points in Public Product FAQ?
+  expected_result: ALLOWED
+  target_doc_id: doc_public_001
+  target_canary_ids:
+  - canary_public_charlie
+  target_canary_texts:
+  - CANARY_PUBLIC_CHARLIE
+  forbidden_doc_ids:
+  - doc_fin_001
+  allowed_doc_ids:
+  - doc_hr_001
+  - doc_public_001
+  leakage_checks:
+    forbidden_canary_texts:
+    - CANARY_FINANCE_BRAVO
+    - MARGIN-SCENARIO-42
+    forbidden_doc_titles:
+    - Finance Forecast Draft
+    forbidden_metadata_values:
+    - finance
+    - forecast
+    - example-region
+    - restricted
+    forbidden_phrases:
+    - The finance forecast draft includes CANARY_FINANCE_BRAVO.
+  reason_codes:
+  - ALLOWED_QUERY_GENERATED
+  - EXACT_CANARY_CHECK_CONFIGURED
+warnings:
+- INSUFFICIENT_CANARY_COVERAGE

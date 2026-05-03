@@ -1,0 +1,6 @@
+VM,VM UUID,sample_start_utc,sample_end_utc,cpu_avg_pct,cpu_p95_pct,cpu_max_pct,memory_avg_pct,memory_p95_pct,memory_max_pct,sample_count
+rightsize-dev-build,inv-uuid-007,2026-04-01T00:00:00Z,2026-04-15T00:00:00Z,2,3,8,18,22,40,336
+rightsize-analytics-cache,inv-uuid-008,2026-04-01T00:00:00Z,2026-04-15T00:00:00Z,3,4,9,20,24,42,336
+rightsize-qa-db,inv-uuid-009,2026-04-01T00:00:00Z,2026-04-15T00:00:00Z,4,5,12,22,28,44,336
+rightsize-unused-app,inv-uuid-010,2026-04-01T00:00:00Z,2026-04-15T00:00:00Z,3,4,10,17,20,38,336
+mig-platform-large,inv-uuid-024,2026-04-01T00:00:00Z,2026-04-03T00:00:00Z,12,18,65,40,58,82,18

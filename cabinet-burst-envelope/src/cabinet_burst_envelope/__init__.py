@@ -1,0 +1,10 @@
+"""Review-only cabinet burst-envelope estimator."""
+
+__version__ = "0.2.0"
+ENVELOPE_SCHEMA_VERSION = "cabinet-burst-envelope.envelope.v1"
+SUMMARY_SCHEMA_VERSION = "cabinet-burst-envelope.summary.v1"
+MANIFEST_SCHEMA_VERSION = "cabinet-burst-envelope.manifest.v1"
+SCENARIO_SCHEMA_VERSION = "cabinet-burst-envelope.scenario.v1"
+REVIEW_LANE_SCHEMA_VERSION = "cabinet-burst-envelope.review_lane.v1"
+ACTION_QUEUE_SCHEMA_VERSION = "cabinet-burst-envelope.action_queue.v1"
+ASSESSMENT_PACKET_SCHEMA_VERSION = "cabinet-burst-envelope.assessment_packet.v1"

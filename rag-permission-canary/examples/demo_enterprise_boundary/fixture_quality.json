@@ -1,0 +1,41 @@
+{
+  "blockers": [],
+  "metadata_quality": {
+    "metadata_values": 80,
+    "repeated_metadata_values": [],
+    "unique_metadata_values": 50
+  },
+  "quality_grade": "STRONG",
+  "reason_codes": [
+    "CONTENT_SET_VALID",
+    "USERS_VALID",
+    "PERMISSIONS_VALID",
+    "ENDPOINT_VALID",
+    "RAW_CONTEXT_CHECK_CONFIGURED",
+    "CITATION_CHECK_CONFIGURED",
+    "METADATA_CHECK_CONFIGURED"
+  ],
+  "schema_version": "rag_permission_canary.fixture_quality.v1",
+  "summary": {
+    "allowed_user_doc_pairs": 32,
+    "canary_count": 20,
+    "documents": 20,
+    "documents_with_canaries": 20,
+    "forbidden_user_doc_pairs": 48,
+    "generated_test_cases": 20,
+    "unique_canary_count": 20,
+    "users": 4,
+    "users_with_allowed_and_forbidden_docs": 4
+  },
+  "surface_coverage": {
+    "answer": true,
+    "citation_doc_ids": true,
+    "citation_titles": true,
+    "citations": true,
+    "metadata": true,
+    "raw_context": true,
+    "snippets": true
+  },
+  "valid": true,
+  "warnings": []
+}

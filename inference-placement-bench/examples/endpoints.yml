@@ -1,0 +1,58 @@
+endpoints:
+  - endpoint_id: endpoint_a
+    display_name: Region A inference endpoint
+    base_url: https://endpoint-a.example.invalid
+    model_name: generic-chat-model
+    protocol: http_json
+    response_mode: streaming
+    auth:
+      type: none
+    declared_location:
+      country: CA
+      region: region-a
+      data_zone: ca-zone-1
+      operator_control: local
+    capabilities:
+      workload_types:
+        - chat_text
+        - completion_text
+      streaming: true
+      max_context_window_tokens: 32768
+      max_output_tokens: 2048
+    unit_economics:
+      currency: CAD
+      input_per_1m_tokens: 1.50
+      output_per_1m_tokens: 5.00
+      per_1k_requests: 0.00
+      minimum_monthly_commit: null
+      notes: "User-supplied example numbers only."
+    request_overrides:
+      path: /v1/chat/completions
+      headers:
+        X-Endpoint-Profile: endpoint_a
+
+  - endpoint_id: endpoint_b
+    display_name: Region B inference endpoint
+    base_url: https://endpoint-b.example.invalid
+    model_name: generic-chat-model
+    protocol: http_json
+    response_mode: non_streaming
+    auth:
+      type: none
+    declared_location:
+      country: CA
+      region: region-b
+      data_zone: ca-zone-2
+      operator_control: partner
+    capabilities:
+      workload_types:
+        - chat_text
+      streaming: false
+      max_context_window_tokens: 8192
+      max_output_tokens: 1024
+    unit_economics:
+      currency: CAD
+      input_per_1m_tokens: 1.10
+      output_per_1m_tokens: 4.00
+      per_1k_requests: 0.00
+      notes: "User-supplied example numbers only."

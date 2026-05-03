@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gpu-rack-qualifier/evidence_bundle.schema.json",
+  "title": "gpu-rack-qualifier evidence bundle",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "tool", "mode", "redacted", "input", "nodes", "outputs", "business_impact", "readiness", "coverage", "action_queue_counts"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "rackq.evidence_bundle.v1"},
+    "generated_at": {"type": "string"},
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "gpu-rack-qualifier"},
+        "version": {"type": "string"}
+      }
+    },
+    "mode": {"const": "REVIEW_ONLY"},
+    "redacted": {"type": "boolean"},
+    "input": {"type": "object"},
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["node_name", "files"],
+        "properties": {
+          "node_name": {"type": "string"},
+          "evidence_dir": {"type": "string"},
+          "qualification_status": {"enum": ["PASS", "REVIEW", "INFERENCE_ONLY", "AVOID_MULTINODE", "QUARANTINE"]},
+          "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+          "slurm_features": {"type": "array", "items": {"type": "string"}},
+          "reason_codes": {"type": "array", "items": {"type": "string"}},
+          "blockers": {"type": "array", "items": {"type": "string"}},
+          "warnings": {"type": "array", "items": {"type": "string"}},
+          "policy_decisions": {"type": "array", "items": {"type": "object"}},
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind", "path", "sha256", "bytes"],
+              "properties": {
+                "kind": {"type": "string"},
+                "path": {"type": "string"},
+                "sha256": {
+                  "type": "string",
+                  "anyOf": [
+                    {"pattern": "^[0-9a-f]{64}$"},
+                    {"const": "REDACTED"}
+                  ]
+                },
+                "bytes": {
+                  "anyOf": [
+                    {"type": "integer", "minimum": 0},
+                    {"type": "null"}
+                  ]
+                },
+                "fingerprint_redacted": {"type": "boolean"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "outputs": {"type": "object"},
+    "business_impact": {"type": "object"},
+    "readiness": {"type": "object"},
+    "coverage": {"type": "object"},
+    "action_queue_counts": {"type": "object"}
+  }
+}

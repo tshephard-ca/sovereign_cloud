@@ -1,0 +1,29 @@
+cabinet_id: cab-d04
+display_name: Cabinet D04
+site_policy_id: default-air-cooled
+
+electrical:
+  usable_sustained_kw: 24.0
+  redundancy_mode: UNKNOWN
+  require_single_feed_survival: false
+
+thermal:
+  inlet_warning_c: 27.0
+  inlet_critical_c: 30.0
+  require_top_middle_bottom: true
+  max_thermal_extrapolation_kw: 5.0
+  thermal_model_required_for_burst: false
+
+guardbands:
+  power_headroom_pct: 10
+  min_power_headroom_kw: 1.0
+  temp_headroom_c: 2.0
+  sustained_window_minutes: 60
+  burst_window_minutes: 5
+  max_burst_duration_minutes: 15
+
+sales_policy:
+  allow_sales_guardrail: true
+  require_ops_review_above_kw: 20.0
+  require_facility_review_above_kw: 24.0
+  wording: conservative

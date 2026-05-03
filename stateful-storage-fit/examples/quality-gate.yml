@@ -1,0 +1,9 @@
+min_core_score: 1.0
+min_topology_score: 0.7
+min_bundle_quality: 0.85
+block_generic_profile: true
+block_path_purpose_mismatch: true
+require_decision_valid: true
+require_case_valid: true
+require_trusted_label_for_outcome_request: false
+require_calibration_ready_for_release: true

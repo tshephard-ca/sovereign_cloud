@@ -1,0 +1,32 @@
+default_queries_per_user: 10
+default_total_queries: 20
+required_allowed_queries: 10
+required_forbidden_queries: 10
+request_timeout_seconds: 60
+require_https: true
+allow_http_local_lab: true
+generation:
+  allow_forbidden_token_in_query: false
+  balance_users: true
+  balance_documents: true
+  max_query_length_chars: 300
+leakage:
+  fail_on_forbidden_canary_in_answer: true
+  fail_on_forbidden_doc_id_in_citation: true
+  fail_on_forbidden_title: true
+  fail_on_forbidden_metadata: true
+  fail_on_forbidden_snippet: true
+  fail_on_forbidden_raw_context: true
+  remove_query_echo_before_check: true
+  case_sensitive_canary_match: true
+  case_insensitive_title_match: true
+  max_redacted_evidence_chars: 120
+allowed_checks:
+  require_allowed_evidence: true
+  require_citations_for_allowed: false
+  allowed_empty_answer_is_review: true
+reporting:
+  redact_by_default: true
+  include_raw_answers: false
+  include_raw_context: false
+  max_answer_excerpt_chars: 180

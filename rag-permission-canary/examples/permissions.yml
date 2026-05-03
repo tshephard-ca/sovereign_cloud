@@ -1,0 +1,29 @@
+permission_model: group_acl
+default_access: deny
+grants:
+  - subject_type: group
+    subject: public_readers
+    access: allow
+    documents:
+      - doc_public_001
+  - subject_type: group
+    subject: hr_readers
+    access: allow
+    collections:
+      - hr
+  - subject_type: group
+    subject: finance_readers
+    access: allow
+    collections:
+      - finance
+denies:
+  - subject_type: group
+    subject: hr_readers
+    access: deny
+    collections:
+      - finance
+  - subject_type: group
+    subject: finance_readers
+    access: deny
+    collections:
+      - hr

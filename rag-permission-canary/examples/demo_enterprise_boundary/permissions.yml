@@ -1,0 +1,89 @@
+permission_model: group_acl
+default_access: deny
+grants:
+- subject_type: group
+  subject: public_readers
+  access: allow
+  collections:
+  - public
+- subject_type: group
+  subject: hr_readers
+  access: allow
+  collections:
+  - hr
+- subject_type: group
+  subject: finance_readers
+  access: allow
+  collections:
+  - finance
+- subject_type: group
+  subject: legal_readers
+  access: allow
+  collections:
+  - legal
+- subject_type: group
+  subject: engineering_readers
+  access: allow
+  collections:
+  - engineering
+denies:
+- subject_type: group
+  subject: hr_readers
+  access: deny
+  collections:
+  - finance
+- subject_type: group
+  subject: hr_readers
+  access: deny
+  collections:
+  - legal
+- subject_type: group
+  subject: hr_readers
+  access: deny
+  collections:
+  - engineering
+- subject_type: group
+  subject: finance_readers
+  access: deny
+  collections:
+  - hr
+- subject_type: group
+  subject: finance_readers
+  access: deny
+  collections:
+  - legal
+- subject_type: group
+  subject: finance_readers
+  access: deny
+  collections:
+  - engineering
+- subject_type: group
+  subject: legal_readers
+  access: deny
+  collections:
+  - hr
+- subject_type: group
+  subject: legal_readers
+  access: deny
+  collections:
+  - finance
+- subject_type: group
+  subject: legal_readers
+  access: deny
+  collections:
+  - engineering
+- subject_type: group
+  subject: engineering_readers
+  access: deny
+  collections:
+  - hr
+- subject_type: group
+  subject: engineering_readers
+  access: deny
+  collections:
+  - finance
+- subject_type: group
+  subject: engineering_readers
+  access: deny
+  collections:
+  - legal

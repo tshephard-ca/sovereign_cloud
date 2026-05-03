@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-permission-canary"
+version = "0.1.0"
+description = "Local-first permission canary regression harness for existing RAG endpoints"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "rag-permission-canary contributors" }
+]
+dependencies = [
+  "typer>=0.9",
+  "pydantic>=2",
+  "PyYAML>=6",
+  "httpx>=0.24"
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=7"
+]
+
+[project.scripts]
+rag-permission-canary = "rag_permission_canary.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

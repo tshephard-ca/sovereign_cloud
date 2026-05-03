@@ -1,0 +1,15 @@
+schema_version: cabinet-burst-envelope.case_manifest.v1
+cabinet_id: cab-c03
+case_goal: assign a cabinet review lane from normalized local evidence
+business_scenario: current load and feed risk stop additional bursty-load discussion
+expected_review_lane: STOP_EXPANSION_DISCUSSION
+review_owner: facility_engineering
+remediation_owner: facility_engineering
+do_not_claim:
+  - facility approval
+  - reserved capacity
+  - customer commitment
+  - quote
+  - operational change
+notes:
+  - Canonical electrical and feed blocker example.

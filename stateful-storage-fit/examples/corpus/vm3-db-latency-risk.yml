@@ -1,0 +1,20 @@
+id: vm3-db-latency-risk
+df: ../vm3_db_latency_risk/df.txt
+mount: ../vm3_db_latency_risk/mount.txt
+fstab: ../vm3_db_latency_risk/fstab.txt
+iostat: ../vm3_db_latency_risk/iostat.txt
+ps: ../vm3_db_latency_risk/ps.txt
+storage_profile: ../storage-profile.yml
+policy_pack: ../policy-packs/relational-database.yml
+expected_fit_status: REVIEW
+expected_requirements:
+  required_access_mode: ReadWriteOnce
+  required_volume_mode: Filesystem
+  preferred_storage_kind: block
+labels:
+  workload_family: relational_database
+  expected_reason_codes:
+    - DB_PROCESS_DETECTED
+    - FAST_STORAGE_RECOMMENDED
+reviewer_notes: Synthetic database workload with high observed await that should require deeper storage testing.
+

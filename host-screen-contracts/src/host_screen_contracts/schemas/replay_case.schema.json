@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Host screen replay case",
+  "type": "object",
+  "required": ["transaction_id", "case_id", "start_screen_hash", "steps", "expected_response"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "transaction_id": { "type": "string" },
+    "case_id": { "type": "string" },
+    "case_kind": { "type": "string" },
+    "start_screen_hash": { "type": "string" },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["expect_screen_hash", "inputs", "aid", "expect_next_screen_hash"],
+        "properties": {
+          "expect_screen_hash": { "type": "string" },
+          "inputs": { "type": "object", "additionalProperties": { "type": "string" } },
+          "aid": { "type": "string" },
+          "expect_next_screen_hash": { "type": "string" }
+        }
+      }
+    },
+    "expected_response": { "type": "object", "additionalProperties": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

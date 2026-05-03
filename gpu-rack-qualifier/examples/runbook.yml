@@ -1,0 +1,14 @@
+evidence: evidence
+node_inventory: node_inventory.yml
+policy: qualification_policy.yml
+business_assumptions: business_assumptions.yml
+
+outputs:
+  dir: ../out
+  labels: slurm_node_labels.csv
+  quarantine: quarantine.csv
+  review_queue: review_queue.csv
+  slurm_fragment: slurm_features.conf.snippet
+  drain_review: drain_review.sh
+  summary: summary.json
+  evidence_bundle: evidence_bundle.json

@@ -1,0 +1,8 @@
+label_scan_left_chars: 40
+generated_hash_length: 12
+max_response_fields_without_field_map: 20
+detect_subfile_min_repeated_rows: 4
+detect_subfile_similarity_pct: 75
+volatile_date_patterns: true
+volatile_time_patterns: true
+redact_sensitive_by_default: true

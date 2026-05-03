@@ -1,0 +1,4 @@
+# User-supplied terms to exclude from shared artifacts.
+# Keep this file project-specific. The repository intentionally does not bundle
+# provider, customer, or consulting-company name lists.
+example-proprietary-term

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/cabinet-burst-envelope/explanation.schema.json",
+  "title": "Cabinet Burst Envelope Explanation",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "tool_version",
+    "cabinet_id",
+    "generated_at",
+    "window",
+    "status",
+    "confidence",
+    "limiting_factor",
+    "calculation_trace",
+    "reason_codes",
+    "warnings",
+    "blockers",
+    "missing_data",
+    "assumptions",
+    "data_honesty_caveats"
+  ],
+  "properties": {
+    "schema_version": {"const": "cabinet-burst-envelope.explanation.v1"},
+    "tool_version": {"type": "string"},
+    "cabinet_id": {"type": "string"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "window": {"type": "object"},
+    "status": {"enum": ["READY_FOR_REVIEW", "REVIEW_REQUIRED", "DO_NOT_EXPAND", "INSUFFICIENT_DATA"]},
+    "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+    "limiting_factor": {"enum": ["ELECTRICAL", "THERMAL", "BOTH", "DATA_QUALITY", "UNKNOWN"]},
+    "calculation_trace": {
+      "type": "object",
+      "required": ["sustained_candidates_kw", "short_burst_candidates_kw", "electrical_basis", "thermal_basis"]
+    },
+    "reason_codes": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "missing_data": {"type": "array", "items": {"type": "string"}},
+    "assumptions": {"type": "array", "items": {"type": "string"}},
+    "data_honesty_caveats": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

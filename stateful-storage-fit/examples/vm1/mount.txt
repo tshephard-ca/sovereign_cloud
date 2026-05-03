@@ -1,0 +1,4 @@
+/dev/sda1 on / type ext4 (rw,relatime)
+tmpfs on /run type tmpfs (rw,nosuid,nodev,mode=755)
+/dev/sdb1 on /data type xfs (rw,relatime,attr2,inode64)
+

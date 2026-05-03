@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/cabinet-burst-envelope/manifest.schema.json",
+  "title": "Evidence Bundle Manifest",
+  "type": "object",
+  "required": ["schema_version", "tool_version", "generated_at", "cabinet_id", "bundle_type", "files", "input_fingerprints"],
+  "properties": {
+    "schema_version": {"const": "cabinet-burst-envelope.manifest.v1"},
+    "tool_version": {"type": "string"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "cabinet_id": {"type": "string"},
+    "bundle_type": {"type": "string"},
+    "files": {"type": "object"},
+    "input_fingerprints": {"type": "object"},
+    "envelope_status": {"enum": ["READY_FOR_REVIEW", "REVIEW_REQUIRED", "DO_NOT_EXPAND", "INSUFFICIENT_DATA", null]},
+    "confidence": {"enum": ["HIGH", "MEDIUM", "LOW", null]},
+    "reason_codes": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "blockers": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

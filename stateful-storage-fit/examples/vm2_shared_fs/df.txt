@@ -1,0 +1,4 @@
+Filesystem              Type      1B-blocks         Used    Available Use% Mounted on
+/dev/sda1               ext4    85899345920  12884901888  73014444032  15% /
+server:/export/content  nfs4   536870912000 322122547200 214748364800  60% /srv/content
+

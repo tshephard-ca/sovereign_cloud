@@ -1,0 +1,1292 @@
+# prompt-egress-guard demo analysis
+
+Analysis date: 2026-05-02
+Repository reviewed: prompt-egress-guard
+Fresh run reviewed: /tmp/prompt-egress-guard-demo-run
+
+## Executive thesis
+
+prompt-egress-guard is strongest when positioned as a local, deterministic prompt-egress control for configured public-AI web use. It is not a full DLP system, not a model gateway, not an endpoint agent, not a compliance platform, and not a universal AI-use monitor. Its value is narrower and more realistic:
+
+It catches risky prompt candidates at the moment a user is about to paste or submit sensitive-looking content into configured public-AI web pages, then blocks, warns, or redirects the user toward an approved AI endpoint while keeping local audit evidence redacted.
+
+That is a credible core-technology wedge because many organizations are trying to support AI adoption without letting employees paste secrets, customer data, health-like records, payroll data, legal-sensitive text, or proprietary source-code-like content into unmanaged external tools. The repo does not try to solve the whole AI governance problem. It provides a practical last-mile control at the browser prompt boundary.
+
+The business value is high when framed as:
+
+- reducing risky prompt egress
+- steering work toward approved AI paths
+- producing privacy-preserving audit evidence
+- supporting AI governance rollout without banning all public AI use
+- giving security teams deterministic policy enforcement and reason-code evidence
+- giving business teams a way to adopt AI with guardrails instead of vague training alone
+
+The core defensibility comes from the combination of policy schemas, deterministic detector categories, action semantics, browser DOM capture, redacted audit summaries, unsafe policy validation, generated real-world coverage, and extension compilation. The weakest area is production extension runtime wiring and browser deployment maturity. The CLI/core behavior is strong and tested; the extension artifact still needs a clean policy-loading path before it should be represented as production-ready managed-browser enforcement.
+
+## External context used
+
+The business stories below were grounded against public guidance and current risk context.
+
+1. OWASP Top 10 for LLM Applications 2025
+   - URL: https://genai.owasp.org/resource/owasp-top-10-for-llm-applications-2025/
+   - Why it matters: OWASP frames LLM-specific risks as a mature security category. prompt-egress-guard directly maps to the sensitive-information and prompt-boundary parts of this problem, especially user-provided sensitive data entering AI systems.
+
+2. OWASP LLM01:2025 Prompt Injection
+   - URL: https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+   - Why it matters: OWASP describes prompt injection as user or external input altering model behavior in unintended ways, with possible sensitive disclosure and unauthorized action. prompt-egress-guard is not a prompt-injection defense for the model itself, but its deterministic input filtering and user warnings support the broader control pattern of treating prompts as risk-bearing inputs.
+
+3. OWASP LLM02:2025 Sensitive Information Disclosure
+   - URL: https://genai.owasp.org/llmrisk/llm022025-sensitive-information-disclosure/
+   - Why it matters: OWASP explicitly includes personal data, financial details, health records, confidential business data, security credentials, legal documents, and source code as sensitive information risks in LLM contexts. These are the exact detector families implemented in the repo.
+
+4. NIST AI Risk Management Framework
+   - URL: https://www.nist.gov/itl/ai-risk-management-framework
+   - Why it matters: NIST AI RMF emphasizes trustworthy AI risk management across governance, measurement, management, and mapping. prompt-egress-guard provides concrete, local evidence for an organization's AI-use governance process.
+
+5. NIST AI 600-1, Generative AI Profile
+   - URL: https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence
+   - Why it matters: NIST's generative AI profile helps organizations identify and manage risks unique to generative AI. prompt-egress-guard is a small control that can contribute to data privacy, security, and governance practices around generative AI use.
+
+6. NIST Cybersecurity Framework 2.0
+   - URL: https://www.nist.gov/publications/nist-cybersecurity-framework-csf-20
+   - Why it matters: NIST CSF 2.0 is built around communicating, assessing, prioritizing, and managing cybersecurity outcomes. prompt-egress-guard's policy IDs, reason codes, action counts, and redacted audit summaries fit that operational style.
+
+7. NIST Privacy Framework
+   - URL: https://www.nist.gov/privacy-framework
+   - Why it matters: the Privacy Framework helps organizations manage privacy risks from data processing. prompt-egress-guard's local-only, no-raw-prompt-by-default design is aligned with minimizing unnecessary prompt data processing.
+
+8. Chrome declarativeNetRequest API documentation
+   - URL: https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest
+   - Why it matters: Chrome documents declarative rules for blocking, redirecting, and modifying network requests without exposing request contents to extensions. This supports the repo's honest distinction between DOM-level prompt scanning and DNR domain/navigation controls.
+
+9. Chrome extension match patterns documentation
+   - URL: https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns
+   - Why it matters: the repo's policy model depends on narrow host permissions and match patterns. This is a key security and deployment boundary.
+
+10. IBM Cost of a Data Breach Report 2025
+   - URL: https://www.ibm.com/reports/data-breach
+   - Why it matters: IBM reports a 2025 global average breach cost of USD 4.4M, that 97 percent of organizations reporting an AI-related security incident lacked proper AI access controls, and that 63 percent lacked AI governance policies to manage AI or prevent shadow AI. prompt-egress-guard should not claim it prevents breach cost directly, but these figures support the business urgency of AI access controls, prompt-data governance, and shadow-AI visibility.
+
+## What I ran locally
+
+Commands run:
+
+- `npm test`
+- `npm run build`
+- `node packages/cli/dist/index.js real-world-run --policy examples/policies/default-policy.yml --output-dir /tmp/prompt-egress-guard-demo-run`
+- `node packages/cli/dist/index.js validate-policy --policy examples/policies/default-policy.yml`
+- `node packages/cli/dist/index.js scan --policy examples/policies/default-policy.yml --text-file examples/prompts/secrets_prompt.txt --output /tmp/prompt-egress-guard-secret-scan.json`
+- `node packages/cli/dist/index.js export-audit --audit-log examples/audit/local_audit.jsonl --output /tmp/prompt-egress-guard-audit-summary.json --redact`
+
+Observed results:
+
+- Test suite: 11 test files passed, 61 tests passed.
+- Build: TypeScript build completed.
+- Policy validation: valid, with warnings for clipboard copy allowed by policy, raw prompt storage disabled, and redaction enabled.
+- Secret scan: produced BLOCK with high confidence, risk score 100, redacted excerpt, and prompt hash. CLI exited with code 2, which is expected for BLOCK or REDIRECT.
+- Redacted audit export: produced summary counts only, not raw prompts.
+- Fresh real-world run: wrote input corpus, scan results, local audit JSONL, audit summary, compiled extension artifacts, business impact report, and assessment.
+
+## Generated input deep dive
+
+The real-world generator creates 13 synthetic prompt records. The corpus is intentionally compact but covers the full policy surface:
+
+- 8 detector categories
+- 4 action outcomes
+- 5 configured public-AI site profiles
+- 7 prompt element types or negative element cases
+- 6 submit paths
+- business context metadata
+- DOM scenario metadata
+- policy mode variants
+- unsafe policy cases
+- long prompt truncation
+- no-prompt selector-staleness case
+- password-field negative case
+- file-field negative case
+- safe allow negative control
+
+Detector categories covered:
+
+- secrets
+- source_code
+- customer_records
+- health_data
+- legal_text
+- internal_identifiers
+- personal_data
+- financial_data
+
+Expected actions covered:
+
+- ALLOW
+- WARN
+- REDIRECT
+- BLOCK
+
+Prompt workflows represented:
+
+- public research summary
+- developer code review
+- configuration troubleshooting
+- health-data-like note rewrite
+- support response drafting
+- legal text drafting
+- finance operations
+- contact cleanup
+- operations note
+- large paste with trailing secret
+- non-captured credential field
+- non-captured file input
+- stale selector simulation
+
+This input design is commercially useful because it maps to real employee behavior:
+
+- A developer pastes source-code-like content for review.
+- An engineer pastes a token or key while troubleshooting.
+- A support user drafts a customer response using account and contact details.
+- A legal user drafts or revises privileged or litigation-sensitive text.
+- A finance user pastes payroll or payment data.
+- An operations user pastes internal hostnames, private IPs, or incident IDs.
+- A user pastes ordinary contact data where warning and education may be enough.
+- A safe public summary should pass.
+
+The negative controls matter just as much:
+
+- password fields should not be read
+- file inputs should not be read
+- missing prompt selectors should warn rather than fabricate content
+- safe public content should not be blocked
+
+Those are trust-building details. A security tool that over-collects prompts, file contents, or password fields can create more risk than it removes. The generator explicitly tests the boundary.
+
+## Generated output deep dive
+
+The fresh real-world assessment status was PASS.
+
+Input coverage:
+
+- prompt_count: 13
+- category_count: 8
+- action_count: 4
+- site_count: 5
+- monitored_policy_site_count: 5
+- has_business_context: true
+- has_dom_scenarios: true
+- has_policy_mode_variants: true
+- has_unsafe_policy_cases: true
+- has_truncation_case: true
+- has_no_prompt_case: true
+- has_password_negative_case: true
+- has_file_negative_case: true
+- has_allow_negative_control: true
+- has_selector_staleness_case: true
+
+Output coverage:
+
+- scan_result_count: 13
+- expected_scan_result_count: 13
+- expected_action_matches: true
+- reason_code_count: 34
+- has_redirect_result: true
+- has_block_result: true
+- has_warn_result: true
+- has_allow_result: true
+- has_prompt_hashes: true
+- has_redacted_excerpts: true
+- raw_secret_absent_from_scan_output: true
+- audit_event_count: 9
+- has_audit_summary: true
+- impact_finding_count: 40
+- has_business_impact_report: true
+- has_extension_manifest: true
+- manifest_host_permission_count: 5
+- has_dnr_rules: true
+- has_content_script_bundle: true
+- has_service_worker_bundle: true
+- deterministic_ordering: true
+
+Scan action counts:
+
+- ALLOW: 4
+- WARN: 2
+- REDIRECT: 3
+- BLOCK: 4
+
+Scan confidence counts:
+
+- HIGH: 4
+- MEDIUM: 5
+- LOW: 4
+
+Audit summary:
+
+- event_count: 9
+- BLOCK: 4
+- REDIRECT: 3
+- WARN: 2
+- categories seen in audit: customer_records, financial_data, health_data, internal_identifiers, legal_text, personal_data, secrets, source_code
+- reason_code_counts include local audit written, policy mode enforce, prompt scanned, action codes, detector codes, and redirect recommendation codes
+- audit warning: REVIEW_ONLY_AUDIT_EXPORT
+
+Compiled extension artifacts:
+
+- manifest.json
+- site_policy.json
+- dnr_rules.json
+- content_script.js
+- service_worker.js
+- warning.html
+
+The generated output is realistic because it does not just produce "blocked" examples. It includes safe content, warning paths, redirect paths, hard block paths, audit evidence, no-raw-secret verification, and extension deployment artifacts.
+
+## Code deep dive
+
+### Monorepo structure
+
+The repo is a TypeScript monorepo:
+
+- `packages/core`: policy schemas, detectors, scoring, decisions, redaction, audit, browser-safe exports
+- `packages/cli`: validate-policy, scan, compile-extension, export-audit, real-world-generate, real-world-run, real-world-assess
+- `packages/extension`: DOM capture, submit interception, overlay, handoff URL, local audit storage, DNR rule generation, extension policy helpers
+- `examples`: synthetic policies, prompts, local audit
+- `docs`: threat model, policy authoring, extension limitations, deployment notes, reason codes
+- `out`: generated test and real-world audit artifacts
+
+That structure supports a useful product architecture:
+
+- core engine can be tested and embedded
+- CLI can support policy validation and offline scans
+- extension package can support browser enforcement
+- generated corpus can support regression and demos
+- docs make the scope honest
+
+### Policy model
+
+The policy model is strong for a first core:
+
+- policy_id and policy_version
+- mode: observe, warn, enforce
+- monitored sites with host permissions, prompt selectors, submit selectors, keyboard submit settings
+- approved destination behavior
+- action thresholds
+- category actions
+- audit settings
+- scanner settings
+- user experience behavior
+- unsafe acknowledgement gates
+- DNR options
+
+Default category actions:
+
+- secrets: BLOCK
+- source_code: REDIRECT
+- customer_records: REDIRECT
+- health_data: BLOCK
+- legal_text: REDIRECT
+- internal_identifiers: WARN
+- personal_data: WARN
+- financial_data: BLOCK
+
+This is the right shape for governance because policy owners can decide where strict blocking is appropriate, where redirect is better, and where warning plus user acknowledgement is enough.
+
+### Policy validation
+
+Policy validation catches unsafe choices:
+
+- invalid policy schema
+- missing monitored sites
+- invalid host permissions
+- broad host permission without acknowledgement
+- unsafe prompt transfer without acknowledgement
+- raw prompt storage without acknowledgement
+- invalid approved destination
+- invalid thresholds
+
+Default validation produced:
+
+- valid: true
+- warnings: CLIPBOARD_COPY_ALLOWED_BY_POLICY, RAW_PROMPT_STORAGE_DISABLED, REDACTION_ENABLED
+- blockers: none
+
+That is commercially important because many failures in AI governance come from unsafe defaults. This repo makes dangerous modes explicit.
+
+### Detector engine
+
+The core detector engine runs deterministic pattern-based detectors:
+
+- secrets
+- source_code
+- customer_records
+- health_data
+- legal_text
+- internal_identifiers
+- personal_data
+- financial_data
+
+Examples:
+
+- secrets: private-key blocks, bearer tokens, API key assignments, connection string credentials, JWT-like tokens, high-entropy secret candidates
+- source code: code fences, declarations, imports, stack traces, SQL code, repo context
+- customer records: labeled customer/account identifiers, support tickets, customer contact combinations
+- health data: patient identifiers plus clinical or medication context
+- legal text: privilege phrases, contract drafts, litigation context, matter identifiers
+- internal identifiers: private IP ranges, internal hostnames, incident/ticket patterns, environment names near internal hosts
+- personal data: email, phone, address, DOB, national ID candidates
+- financial data: payment-card candidates using Luhn validation, bank account labels, payroll context, tax identifiers, payment secrets
+
+The detector approach is not comprehensive DLP. It is deterministic prompt triage. That is a strength for explainability and a limitation for coverage.
+
+### Scoring and action decisions
+
+The decision logic combines:
+
+- category scores
+- aggregate confidence
+- score thresholds
+- category-specific actions
+- strongest action across categories and thresholds
+- policy mode adjustment
+
+Policy modes:
+
+- observe: never enforces block or redirect, useful for pilot measurement
+- warn: converts stronger actions to warning, useful for rollout and training
+- enforce: applies configured action behavior
+
+Default thresholds:
+
+- warn_score: 20
+- redirect_score: 45
+- block_score: 70
+
+This gives the repo a practical rollout path:
+
+1. observe mode to measure matches without blocking
+2. warn mode to train users and tune policy
+3. enforce mode for high-risk categories
+
+That progression is exactly how cautious organizations can deploy AI controls without breaking business workflows.
+
+### Redaction and audit
+
+Raw prompts are not stored by default. Scan results include:
+
+- action
+- risk score
+- confidence
+- categories
+- reason codes
+- redacted excerpt
+- prompt hash
+- warnings
+- blockers
+
+Audit events include:
+
+- event id
+- timestamp
+- policy id
+- site id, if configured
+- action
+- risk score
+- confidence
+- categories
+- reason codes
+- prompt hash, if configured
+- redacted excerpt, if configured
+- handoff id for redirect
+- user decision
+
+The fresh run confirmed:
+
+- raw synthetic secrets were absent from scan output
+- audit summary had counts only
+- redacted excerpts were present
+- prompt hashes were present for non-empty scans
+
+This is one of the repo's strongest business features. It gives governance and security teams metrics without collecting the sensitive material they are trying to prevent from spreading.
+
+### Browser DOM capture
+
+The extension DOM capture logic supports:
+
+- textarea
+- text/search input
+- contenteditable
+- role textbox
+- active prompt preference
+- same-form prompt preference
+- largest prompt fallback
+- multiple prompt warning
+- no prompt warning
+
+It ignores:
+
+- password fields
+- file inputs
+- hidden inputs
+- checkboxes
+- radio buttons
+- submit buttons
+- autocomplete credit-card or password fields
+- elements marked with `data-peg-ignore="true"`
+
+This is commercially meaningful because the extension must not become a broad data collector. It should inspect likely prompt boxes only.
+
+### Submit interception
+
+The extension intercepts:
+
+- form submit
+- configured button click
+- configured Ctrl+Enter
+- configured Cmd+Enter
+- optionally plain Enter
+
+It prevents submission for:
+
+- WARN
+- REDIRECT
+- BLOCK
+
+It allows a one-time confirmed resubmit only when:
+
+- action is WARN
+- policy allows continue on warn
+
+This supports a good user experience:
+
+- safe prompts pass
+- warning prompts require explicit user review
+- redirect prompts open an approved path
+- block prompts are stopped
+
+### Handoff to approved endpoint
+
+Redirect handoff builds a URL with:
+
+- handoff_id
+- policy_id
+- action
+- reason_codes
+
+By default it does not include the raw prompt. The default approved destination has `include_prompt: false`.
+
+This is a core business story. The tool does not merely block users. It redirects high-value work to the approved AI path while preserving enough context for the destination to understand why handoff occurred.
+
+### Extension compilation
+
+The compile command writes:
+
+- manifest with Manifest V3
+- host permissions from policy
+- content script matches from policy
+- DNR rule file
+- site policy file
+- warning page
+- bundled content script
+- bundled service worker
+
+The generated manifest had:
+
+- manifest_version: 3
+- storage and declarativeNetRequest permissions
+- 5 host permissions
+- content scripts for 5 configured example domains
+- declarative net request ruleset
+
+This is promising, but there is a runtime wiring gap:
+
+The compiled artifact writes `site_policy.json`, but the content script only auto-starts if `window.__PEG_POLICY__` already exists. I did not find code that loads `site_policy.json` and initializes the content script with the correct site policy at runtime. Tests cover the capture, submit, overlay, handoff, storage, and DNR helper functions, but they do not prove that the compiled extension loads policy and starts correctly in a real browser.
+
+That gap should be resolved before presenting the browser extension as production-ready. The core and CLI are solid; production extension enforcement needs final runtime integration.
+
+### Declarative network rules boundary
+
+The generated DNR rules block main-frame navigation to configured domains. Chrome's DNR API is designed for declarative request blocking or redirection without reading request content. That is privacy-positive but does not inspect prompt bodies.
+
+The repo documents this honestly:
+
+- DNR can enforce configured domain scope
+- DNR does not inspect prompt content
+- content scripts inspect configured DOM prompt boxes
+- request-body interception is out of scope
+
+The current default generated DNR rules may be too blunt for a prompt-inspection deployment because blocking main-frame navigation to the configured public-AI site could prevent the content script from ever running on that site. In practice, deployment profiles should choose one of these patterns intentionally:
+
+- domain-block profile: block configured public-AI navigation and send users to an approved page
+- prompt-guard profile: allow configured pages to load, then use DOM interception before submit
+- hybrid profile: use DNR for unapproved domains and content scripts for allowed-but-guarded domains
+
+This is a key production design decision.
+
+## Personas
+
+1. CISO
+   - Owns enterprise risk reduction, AI oversight, and executive reporting.
+
+2. AI governance lead
+   - Owns policy, acceptable use, approved AI destinations, and rollout process.
+
+3. Security engineering lead
+   - Owns browser extension packaging, policy validation, detector tuning, and deployment safety.
+
+4. Privacy officer
+   - Owns personal data handling, minimal collection, redaction, retention, and privacy risk evidence.
+
+5. Legal operations lead
+   - Owns privileged, contract, litigation, and matter-sensitive text workflows.
+
+6. Application security lead
+   - Owns source-code exposure risk and safe developer AI use.
+
+7. Developer
+   - Wants AI help with code, stack traces, and debugging, but needs safe routing.
+
+8. Support operations manager
+   - Owns customer support workflows and customer-record handling.
+
+9. Finance operations manager
+   - Owns payroll, payment, bank account, and financial-data handling.
+
+10. Health-data compliance owner
+   - Owns patient-like or clinical-context data restrictions where applicable.
+
+11. Endpoint/browser administrator
+   - Owns managed browser deployment, host permissions, extension updates, and selector maintenance.
+
+12. Internal audit or risk reviewer
+   - Needs evidence that controls exist, operate locally, and avoid collecting raw prompts.
+
+13. Employee end user
+   - Needs a clear, fast, non-hostile nudge at the moment of risky AI use.
+
+## Top business stories
+
+### 1. Shadow AI seatbelt at the browser prompt boundary
+
+Personas:
+
+- CISO
+- AI governance lead
+- Security engineering lead
+- Employee end user
+- Internal audit reviewer
+
+Story:
+
+Employees are using convenient public-AI web tools even when official guidance is incomplete or not yet adopted. The CISO does not want a simple ban, because that drives usage further underground. The AI governance lead deploys prompt-egress-guard in observe or warn mode first, measuring which categories appear in public-AI prompts without storing raw prompts. After tuning, high-risk categories move to enforce mode.
+
+Why this has high ROI:
+
+- meets employees where they already work
+- produces visibility without collecting raw prompts
+- supports staged rollout instead of a brittle ban
+- creates measurable reason-code counts for governance
+- reduces obvious prompt egress for secrets, financial data, and health-data-like content
+
+Why it is credible:
+
+- IBM's 2025 breach report shows AI oversight and access-control gaps are a current business concern.
+- The repo supports observe, warn, and enforce modes.
+- Audit summaries are local and redacted.
+- The repo does not claim universal AI coverage.
+
+Business impact:
+
+This can become a practical first control in an AI acceptable-use program. It helps the CISO show movement from policy-only governance to actual user-action controls.
+
+### 2. Secret-in-prompt hard stop for engineering and operations
+
+Personas:
+
+- Security engineering lead
+- Application security lead
+- Developer
+- Endpoint/browser administrator
+- Internal audit reviewer
+
+Story:
+
+A developer or operations engineer is troubleshooting and accidentally pastes an authorization header, API key assignment, connection string, or token-like value into a public-AI prompt. prompt-egress-guard detects the secret-like pattern locally and blocks the configured submission. The user sees reason codes and a redacted excerpt, not a vague generic warning.
+
+Generated evidence:
+
+- `secret_bearer_token` produced BLOCK.
+- The example secret scan produced BLOCK, risk score 100, high confidence.
+- Reason codes included BEARER_TOKEN_DETECTED and ACTION_BLOCK.
+- The redacted excerpt replaced the token.
+- Raw synthetic secrets were absent from scan output.
+
+Why this has high ROI:
+
+- a single exposed credential can trigger incident response, key rotation, forensic work, and customer concern
+- the control acts before the prompt leaves the browser
+- it supports audit evidence without retaining the secret
+- it gives developers a clear secure-workflow nudge
+
+Why it is credible:
+
+- the repo uses deterministic secret patterns, not an LLM classifier
+- raw prompt storage is disabled by default
+- unsafe raw storage requires explicit acknowledgement
+- false negatives remain possible, so the story is risk reduction, not complete prevention
+
+Business impact:
+
+This is one of the strongest immediate use cases. It maps directly to operational risk and can be tested with deterministic examples.
+
+### 3. Developer source-code redirect to an approved AI endpoint
+
+Personas:
+
+- Application security lead
+- Developer
+- AI governance lead
+- Security engineering lead
+
+Story:
+
+Developers want AI help with code review, stack traces, SQL, and repo context. A blunt block frustrates them and encourages workarounds. prompt-egress-guard identifies source-code-like prompts and redirects the workflow to an approved AI endpoint rather than allowing the public-AI submission.
+
+Generated evidence:
+
+- `developer_source_code` produced REDIRECT.
+- Categories included source_code and internal_identifiers.
+- Reason codes included CODE_BLOCK_DETECTED, SOURCE_CODE_PATTERN_DETECTED, REPOSITORY_CONTEXT_DETECTED, and INTERNAL_TICKET_PATTERN_DETECTED.
+- Handoff URL included policy id, action, reason codes, and handoff id.
+- Handoff did not include the raw prompt by default.
+
+Why this has high ROI:
+
+- preserves developer productivity
+- reduces unmanaged source-code exposure
+- drives adoption of approved internal tools
+- creates reason-code evidence for AppSec policy tuning
+- avoids turning security into a pure blocker
+
+Why it is credible:
+
+- the tool says source-code-like content, not confirmed proprietary code
+- redirect is a controlled middle ground
+- raw prompt transfer is off by default
+- clipboard copy is explicit and policy-governed
+
+Business impact:
+
+This is a strong adoption story. The product protects sensitive developer workflows while making the approved path easier to choose.
+
+### 4. Customer support record redirect
+
+Personas:
+
+- Support operations manager
+- Privacy officer
+- AI governance lead
+- Employee end user
+- Internal audit reviewer
+
+Story:
+
+A support employee drafts a reply using a customer ID, support ticket, name, email, and account status. The guard detects a customer-record-like prompt and redirects to the approved endpoint. The user still gets help, but the workflow moves away from unmanaged public AI.
+
+Generated evidence:
+
+- `customer_support_record` produced REDIRECT.
+- Categories included customer_records and personal_data.
+- Reason codes included ACCOUNT_IDENTIFIER_PATTERN_DETECTED, CUSTOMER_RECORD_PATTERN_DETECTED, SUPPORT_TICKET_PATTERN_DETECTED, CUSTOMER_CONTACT_COMBINATION_DETECTED, and EMAIL_ADDRESS_DETECTED.
+
+Why this has high ROI:
+
+- customer operations are high-volume
+- support teams are likely AI adopters because writing assistance is useful
+- customer data often appears in natural-language prompts
+- redirect supports productivity while reducing external exposure
+
+Why it is credible:
+
+- the detector uses labeled identifiers and contact combinations
+- action is redirect, not a claim of compliance
+- audit uses category and reason-code counts, not raw customer text
+
+Business impact:
+
+This helps convert AI acceptable-use policy into workflow-level behavior for customer-facing teams.
+
+### 5. Health-data-like hard stop
+
+Personas:
+
+- Health-data compliance owner
+- Privacy officer
+- CISO
+- AI governance lead
+- Employee end user
+
+Story:
+
+A user attempts to rewrite a health-data-like note containing a patient identifier and clinical or medication context. The policy blocks the prompt instead of warning or redirecting. The user receives reason codes and a redacted excerpt.
+
+Generated evidence:
+
+- `health_case_note` produced BLOCK.
+- Categories included health_data.
+- Reason codes included PATIENT_IDENTIFIER_PATTERN_DETECTED, HEALTH_RECORD_PATTERN_DETECTED, CLINICAL_NOTE_PATTERN_DETECTED, and MEDICATION_CONTEXT_DETECTED.
+
+Why this has high ROI:
+
+- health-like data carries high privacy, legal, and reputational risk
+- hard blocking is easier to justify for sensitive categories
+- local detection avoids sending health-like text to a classifier
+- the control gives governance teams a clear enforcement point
+
+Why it is credible:
+
+- the repo says health-data-like content, not verified regulated health data
+- it does not make compliance claims
+- it keeps the prompt local
+- it uses deterministic evidence and redaction
+
+Business impact:
+
+For organizations handling health-like workflows, this is a clear example of policy enforcement where a warning is not enough.
+
+### 6. Finance and payroll data hard stop
+
+Personas:
+
+- Finance operations manager
+- Privacy officer
+- Security engineering lead
+- Internal audit reviewer
+
+Story:
+
+A finance employee pastes payroll context, payment-card-like data, or bank account labels into a public-AI prompt. prompt-egress-guard blocks the submission and records a redacted audit event.
+
+Generated evidence:
+
+- `financial_card_payroll` produced BLOCK.
+- Categories included financial_data and personal_data.
+- Reason codes included PAYMENT_CARD_CANDIDATE_DETECTED, BANK_ACCOUNT_PATTERN_DETECTED, PAYROLL_CONTEXT_DETECTED, PHONE_NUMBER_DETECTED, and ACTION_BLOCK.
+- Payment card detection uses Luhn validation to reduce obvious false positives.
+
+Why this has high ROI:
+
+- finance and payroll data is sensitive and business-critical
+- accidental data exposure can trigger legal, employee-trust, and audit issues
+- deterministic blocking is easy to explain to finance leadership
+- audit counts can show where training or policy updates are needed
+
+Why it is credible:
+
+- the output says financial-sensitive prompt candidate
+- no pricing or compliance claims are made
+- raw prompts are not stored by default
+
+Business impact:
+
+This story gives finance and audit teams a concrete AI-risk control they can understand without needing AI model expertise.
+
+### 7. Legal-sensitive text redirect instead of uncontrolled external drafting
+
+Personas:
+
+- Legal operations lead
+- Privacy officer
+- AI governance lead
+- Employee end user
+
+Story:
+
+A legal user drafts or revises text containing privilege-like language, matter identifiers, settlement language, or litigation context. prompt-egress-guard redirects the work to an approved AI endpoint rather than allowing the public-AI submission.
+
+Generated evidence:
+
+- `legal_sensitive_text` produced REDIRECT.
+- Categories included legal_text and personal_data.
+- Reason codes included LEGAL_PRIVILEGE_PATTERN_DETECTED, CONTRACT_DRAFT_PATTERN_DETECTED, LITIGATION_CONTEXT_DETECTED, MATTER_IDENTIFIER_PATTERN_DETECTED, and PHONE_NUMBER_DETECTED.
+
+Why this has high ROI:
+
+- legal teams need AI drafting help but cannot casually expose privileged or matter-sensitive context
+- redirect preserves productivity
+- policy owners can decide whether some legal categories should be blocked instead
+- redacted audit summaries let legal ops see trend data without collecting legal text
+
+Why it is credible:
+
+- legal-sensitive text is treated as candidate content
+- the tool does not assess privilege as a legal conclusion
+- policy authoring docs explicitly ask whether legal-sensitive text should redirect, block, or require review
+
+Business impact:
+
+This is a strong executive story because it protects a high-risk knowledge workflow while still enabling approved AI adoption.
+
+### 8. Warn-mode training for lower-risk personal or internal identifiers
+
+Personas:
+
+- AI governance lead
+- Privacy officer
+- Employee end user
+- Security awareness lead
+
+Story:
+
+Not every risky prompt deserves a hard block. For lower-risk contact cleanup or internal operational identifiers, the policy can warn, display reason codes, and require acknowledgement before continuing. This gives employees immediate feedback at the moment of behavior.
+
+Generated evidence:
+
+- `personal_contact_warn` produced WARN.
+- `internal_identifier_warn` produced WARN.
+- Categories included personal_data and internal_identifiers.
+- Warnings can allow one confirmed resubmit when policy permits.
+
+Why this has high ROI:
+
+- improves user behavior without overwhelming teams with blocked work
+- turns AI policy into just-in-time training
+- creates metrics on where users need guidance
+- makes rollout less disruptive
+
+Why it is credible:
+
+- warn mode is explicit
+- continue behavior is policy-controlled
+- reason codes are shown
+- audit captures counts without raw prompts
+
+Business impact:
+
+This supports culture change. It helps users learn what the organization considers sensitive in AI prompts.
+
+### 9. Local redacted audit for AI governance evidence
+
+Personas:
+
+- Internal audit reviewer
+- CISO
+- AI governance lead
+- Privacy officer
+
+Story:
+
+The organization needs evidence that AI prompt controls are operating, but it does not want to build a new sensitive prompt database. prompt-egress-guard stores local audit events and exports redacted summaries with action counts, category counts, reason-code counts, first/last event time, and review-only warnings.
+
+Generated evidence:
+
+- audit event count: 9
+- action counts: 4 BLOCK, 3 REDIRECT, 2 WARN
+- category counts include all risk families seen in the generated run
+- audit summary warning: REVIEW_ONLY_AUDIT_EXPORT
+- raw prompt storage disabled by default
+
+Why this has high ROI:
+
+- gives audit and governance teams evidence without expanding sensitive-data retention
+- helps tune policy based on actual categories and actions
+- supports pilot-to-enforce rollout
+- can be included in internal AI governance dashboards
+
+Why it is credible:
+
+- raw prompt storage is not the default
+- prompt hashes support correlation without prompt reconstruction
+- redacted excerpt length is capped
+- unsafe audit storage requires acknowledgement
+
+Business impact:
+
+This is the governance story that makes the tool more than a user popup. It creates measurable AI-control evidence.
+
+### 10. Policy validation as a deployment safety gate
+
+Personas:
+
+- Security engineering lead
+- Endpoint/browser administrator
+- AI governance lead
+- Internal audit reviewer
+
+Story:
+
+Before deploying a browser policy, the admin runs validation. Unsafe settings such as raw prompt storage, prompt transfer to the approved endpoint, and broad host permissions fail unless explicitly acknowledged. Invalid host permissions and threshold issues are reported before packaging.
+
+Generated evidence:
+
+- default policy validated successfully
+- unsafe policy tests fail for unacknowledged prompt transfer
+- tests cover approved destination URL safety
+- broad host permission requires acknowledgement
+
+Why this has high ROI:
+
+- prevents accidental unsafe deployments
+- creates a repeatable change-control step
+- reduces risk from policy drift
+- gives auditors a deterministic pre-deployment check
+
+Why it is credible:
+
+- validation is local and deterministic
+- blockers are explicit
+- warnings distinguish unsafe from intentional
+
+Business impact:
+
+Policy validation is a core platform capability. It protects the organization from its own misconfiguration.
+
+### 11. Managed-browser deployment artifact with narrow host permissions
+
+Personas:
+
+- Endpoint/browser administrator
+- Security engineering lead
+- CISO
+
+Story:
+
+The endpoint team compiles a Manifest V3 extension from an approved policy. The generated manifest includes narrow host permissions, content script matches, DNR rules, a service worker, and local storage support. The endpoint team reviews generated artifacts before deployment through its browser administration process.
+
+Generated evidence:
+
+- manifest_version: 3
+- host permissions: 5 configured example domains
+- no `<all_urls>` in default manifest
+- DNR rules generated from policy domains
+- content script and service worker bundles generated
+
+Why this has high ROI:
+
+- deployment can use existing managed-browser channels
+- host permissions are explicit and reviewable
+- extension artifacts are deterministic
+- the same policy can drive CLI scanning and extension packaging
+
+Why it is credible:
+
+- Chrome's extension model supports match patterns and DNR rules
+- docs explain browser limitations
+- repo does not claim native app, mobile, API, or unmanaged browser coverage
+
+Business impact:
+
+This is the operationalization story. Without managed-browser deployment, the tool remains a CLI and demo. With it, the policy becomes a real user-facing control.
+
+Important caveat:
+
+The compiled extension currently needs runtime policy-loading integration before production claims. The artifact writes `site_policy.json`, but the content script expects `window.__PEG_POLICY__`. This should be fixed before making strong deployment claims.
+
+### 12. Synthetic real-world coverage lab for AI-control regression
+
+Personas:
+
+- Security engineering lead
+- QA engineer
+- AI governance lead
+- Endpoint/browser administrator
+
+Story:
+
+Before changing detectors, policy thresholds, DOM selectors, or extension behavior, the team runs the real-world generator and assessment. The generated corpus covers all detector categories, action outcomes, configured sites, element types, submit paths, unsafe policy cases, negative controls, and output artifacts. The assessment fails if coverage gaps appear.
+
+Generated evidence:
+
+- real-world assessment status: PASS
+- input gaps: none
+- output gaps: none
+- 40 business impact findings generated
+- deterministic ordering: true
+- expected actions matched scan outputs
+
+Why this has high ROI:
+
+- prevents regressions in sensitive prompt handling
+- supports safe policy iteration
+- creates realistic demo data without exposing customer prompts
+- allows security teams to test policy packs before rollout
+
+Why it is credible:
+
+- the generator includes negative cases and edge cases
+- raw synthetic secrets are verified absent from outputs
+- coverage is explicit
+- tests include the generator and assessment
+
+Business impact:
+
+This is a core-technology story because it provides a lab for evolving the control without customer data.
+
+### 13. Approved-endpoint routing as a business enablement layer
+
+Personas:
+
+- AI governance lead
+- Developer
+- Support operations manager
+- Legal operations lead
+- CISO
+
+Story:
+
+Instead of saying "do not use AI," the organization provides an approved AI endpoint. prompt-egress-guard detects sensitive-pattern prompt candidates on configured public-AI pages and opens the approved endpoint handoff with reason codes and a stable handoff ID. The user's work is not simply stopped; it is routed.
+
+Why this has high ROI:
+
+- preserves user productivity
+- increases adoption of approved AI tools
+- gives governance teams a natural control point
+- reduces adversarial user behavior caused by blanket blocking
+
+Why it is credible:
+
+- handoff excludes raw prompt by default
+- prompt transfer requires explicit unsafe acknowledgement
+- reason codes explain the routing decision
+- approved endpoint controls are not assumed or verified by this repo
+
+Business impact:
+
+This is a powerful sales story. It changes the tool from "security says no" to "security routes sensitive work to the right place."
+
+### 14. Selector-staleness and browser-boundary honesty
+
+Personas:
+
+- Endpoint/browser administrator
+- Security engineering lead
+- AI governance lead
+- Employee end user
+
+Story:
+
+Public-AI web pages change. DOM selectors break. prompt-egress-guard includes no-prompt and selector-staleness cases so admins can identify when configured selectors no longer capture prompt boxes. It also documents that browser extensions do not cover native apps, mobile apps, private browsing, API clients, unmanaged browsers, unconfigured sites, or copy/paste into other channels.
+
+Why this has high ROI:
+
+- prevents false confidence in stale controls
+- creates a maintenance responsibility for site selector packs
+- helps scope executive claims accurately
+- reduces the risk of audit overstatement
+
+Why it is credible:
+
+- README and docs clearly state limitations
+- generated input includes a stale selector simulation
+- no-prompt behavior produces a warning and allow path, not invented content
+
+Business impact:
+
+This story matters because buyers trust tools that state their limits. Honest boundaries are part of the value.
+
+## ROI model
+
+prompt-egress-guard should not claim direct savings from prevented breaches. A credible ROI model should measure operational control outcomes:
+
+1. Risky prompt attempts stopped or redirected
+   - Metric: BLOCK, REDIRECT, and WARN counts by category and site.
+   - Business value: visibility and reduction of unmanaged sensitive prompt egress.
+
+2. Approved AI adoption
+   - Metric: redirect handoff count and downstream approved endpoint usage.
+   - Business value: productivity preserved while steering work to governed tools.
+
+3. Secret exposure reduction
+   - Metric: secret-related block count, rotation incidents avoided or detected early.
+   - Business value: fewer accidental credential exposures and fewer emergency response cycles.
+
+4. Policy rollout maturity
+   - Metric: observe-to-warn-to-enforce progression, false positive reports, policy version adoption.
+   - Business value: governance becomes measurable instead of policy-only.
+
+5. Audit effort reduced
+   - Metric: time to produce redacted AI-use evidence and reason-code summaries.
+   - Business value: audit can review controls without collecting raw prompts.
+
+6. User training effectiveness
+   - Metric: repeated WARN events per category and decline over time.
+   - Business value: behavior change at the moment of risk.
+
+7. Deployment safety
+   - Metric: invalid policies blocked before packaging, broad host permissions rejected unless acknowledged.
+   - Business value: fewer unsafe control deployments.
+
+8. Engineering regression prevention
+   - Metric: generated real-world assessment pass/fail over detector and extension changes.
+   - Business value: reduced risk of shipping a broken control.
+
+External business context:
+
+IBM's 2025 breach-cost report gives the economic backdrop: breach costs remain material, AI oversight is lagging adoption, and many AI-related incidents lack proper access controls. prompt-egress-guard should use this context to justify urgency, not to claim it eliminates breach cost.
+
+## Why this can become defensible core technology
+
+The defensible parts are not the individual regexes. Competitors can write regexes. The defensibility comes from the operating system around prompt egress:
+
+- policy schema and validation gates
+- deterministic action semantics
+- detector category taxonomy
+- local redaction and hashing
+- no-raw-prompt audit design
+- browser DOM capture boundary
+- submit interception behavior
+- approved-endpoint handoff semantics
+- generated real-world corpus and coverage assessment
+- reason-code dictionary
+- unsafe policy acknowledgement model
+- extension packaging flow
+- rollout modes: observe, warn, enforce
+
+The more customers or internal teams use this, the more valuable the policy packs, selector maintenance process, false-positive records, category tuning, deployment playbooks, and governance metrics become. That is where durable value can accumulate.
+
+## Current gaps and limits
+
+1. Extension policy loading is incomplete
+   - The compiled artifact writes `site_policy.json`, but the content script auto-starts only when `window.__PEG_POLICY__` exists. A production extension needs a reliable runtime path to load the compiled policy and start the content script for the matching site.
+
+2. DNR and DOM-guard modes need clearer deployment profiles
+   - Generated DNR rules block main-frame navigation to configured domains. That can conflict with a content-script prompt guard that needs the page to load. The repo should provide explicit profiles for block-all, prompt-guard, and hybrid deployment.
+
+3. No real browser end-to-end test
+   - Tests use happy-dom and unit-level extension functions. There is no Playwright or browser-extension end-to-end test proving installation, policy load, prompt capture, overlay, local audit, and handoff in a browser.
+
+4. Selector maintenance is unsolved operationally
+   - The repo warns that selectors can go stale, but does not yet provide selector-pack ownership, validation cadence, or automatic stale-selector reporting across deployed clients.
+
+5. Pattern detectors are not full DLP
+   - Regex detectors can false-positive and false-negative. This is acceptable for deterministic prompt triage, but should not be marketed as complete sensitive-data discovery.
+
+6. No centralized admin reporting
+   - Audit is local and redacted, which is privacy-positive. Enterprise rollout may still need a privacy-preserving way to aggregate counts without raw prompts.
+
+7. No managed-browser deployment package
+   - Docs say the repo does not sign, publish, install, or centrally manage the extension. That is fine for MVP, but production buyers will need deployment guidance and artifacts.
+
+8. Approved endpoint is not verified
+   - The tool can redirect, but it does not verify the approved endpoint's controls. The docs state this correctly.
+
+9. Clipboard copy can be risky
+   - Default policy allows clipboard copy for approved destination flow. That may be acceptable for some pilots, but stricter deployments may disable it.
+
+10. No response-side controls
+   - The project does not inspect model responses. This is documented and should remain a separate module if added later.
+
+11. No API, native app, or mobile coverage
+   - Browser extension coverage is inherently limited.
+
+12. No user or group policy targeting
+   - Policy is not yet scoped by department, role, risk tier, or managed browser group.
+
+13. No incident workflow integration
+   - BLOCK events do not create tickets, secret rotation tasks, or compliance review tasks. That may be a future integration, but should preserve raw prompt minimization.
+
+14. No formal false-positive review loop
+   - The repo has generated coverage, but not an outcome ledger for real user disputes, accepted redirects, overridden warnings, or policy tuning.
+
+15. No signed policy bundle or policy provenance
+   - Policy version exists, but stronger production governance would include policy hash, signer, approval metadata, and rollback support.
+
+## Highest-impact next moves
+
+1. Fix runtime extension policy loading
+   - Load `site_policy.json` from extension resources or bundle the policy into the content script safely.
+   - Select the matching site config based on current URL.
+   - Start the content script automatically.
+
+2. Add browser extension end-to-end tests
+   - Use a real browser test harness.
+   - Verify install, host match, policy load, capture, submit prevention, overlay, audit write, and handoff.
+
+3. Split DNR deployment profiles
+   - `domain_block`
+   - `prompt_guard`
+   - `hybrid`
+   - Make the default demo profile align with the story being demonstrated.
+
+4. Add selector-pack certification
+   - Each selector pack should prove prompt capture, submit interception, no password/file capture, and stale-selector warnings using synthetic pages.
+
+5. Add privacy-preserving enterprise summary export
+   - Aggregate counts by policy id, action, category, reason code, and site id.
+   - Keep raw prompts out.
+   - Consider local signing or hashing for integrity.
+
+6. Add policy provenance
+   - policy hash
+   - approved by
+   - approval date
+   - change reason
+   - rollback id
+
+7. Add feedback and tuning workflow
+   - false positive
+   - false negative
+   - user accepted redirect
+   - user cancelled
+   - warning continued
+   - policy owner decision
+
+8. Add department policy variants
+   - developer workstation
+   - support
+   - legal
+   - finance
+   - health-data-like workflows
+   - warn-only pilot
+   - strict enforcement
+
+9. Add incident-handoff templates
+   - secret block: rotate credential workflow
+   - finance block: notify finance data owner
+   - health block: privacy review
+   - legal redirect: approved legal AI workflow
+
+10. Add deployment runbook
+   - managed browser install path
+   - policy update process
+   - selector owner
+   - audit export cadence
+   - rollback
+   - user communication
+
+## Recommended demo narrative
+
+The strongest demo should not begin with "we built a browser extension." It should begin with the operating problem:
+
+1. Employees want to use AI now.
+2. Policy alone does not stop risky paste events.
+3. Banning everything drives shadow use.
+4. The organization needs a local, low-friction prompt boundary.
+5. Safe public prompts should pass.
+6. Low-risk personal/internal identifiers should warn and train.
+7. Developer/customer/legal workflows should redirect to approved AI.
+8. Secrets, financial data, and health-data-like prompts should block.
+9. Audit evidence should be redacted and local.
+10. Unsafe policy choices should fail validation.
+11. Browser limits must be explicit.
+12. Production rollout needs managed-browser packaging and selector maintenance.
+
+That story is realistic and credible. It sells the tool as a narrow but valuable control, not as a magic AI security platform.
+
+## Bottom line
+
+prompt-egress-guard has real business value as a deterministic, local prompt-egress guard for configured public-AI web pages. Its best stories are not abstract AI safety stories. They are concrete operational stories:
+
+- block accidental secret pastes
+- redirect source-code-like work to approved AI
+- redirect customer support records
+- block health-data-like and financial-sensitive prompts
+- warn and train on lower-risk personal or internal identifiers
+- preserve privacy with local redacted audit
+- validate unsafe policy settings before deployment
+- package managed-browser artifacts with narrow host permissions
+- use generated real-world coverage to prevent regressions
+
+The repo is close to a credible core technology because it has a policy engine, detector taxonomy, local redaction, audit summaries, real-world generator, extension pieces, and tests. The main blocker to stronger production claims is extension runtime integration: policy loading, browser end-to-end validation, DNR deployment profiles, and selector maintenance need to be completed.
+
+The most compelling business framing is:
+
+"A local, deterministic browser guardrail that lets employees keep using AI while stopping or rerouting the riskiest prompt egress before it leaves the page, with redacted evidence that governance and security teams can actually use."

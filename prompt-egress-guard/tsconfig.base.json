@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "declaration": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@prompt-egress-guard/core": ["packages/core/src/index.ts"],
+      "@prompt-egress-guard/core/browser": ["packages/core/src/browser.ts"],
+      "@prompt-egress-guard/extension": ["packages/extension/src/index.ts"]
+    }
+  }
+}

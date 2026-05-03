@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Host screen field map",
+  "type": "object",
+  "properties": {
+    "transaction_id": { "type": "string" },
+    "display_name": { "type": "string" },
+    "endpoint_path": { "type": "string" },
+    "volatile_regions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/volatile_region" },
+      "default": []
+    },
+    "fields": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/field" },
+      "default": []
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "volatile_region": {
+      "type": "object",
+      "required": ["screen_ref", "row", "col", "length"],
+      "properties": {
+        "screen_ref": { "type": "string" },
+        "row": { "type": "integer", "minimum": 1 },
+        "col": { "type": "integer", "minimum": 1 },
+        "length": { "type": "integer", "minimum": 1 },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "field": {
+      "type": "object",
+      "properties": {
+        "screen_ref": { "type": "string" },
+        "field_id": { "type": "string" },
+        "row": { "type": "integer", "minimum": 1 },
+        "col": { "type": "integer", "minimum": 1 },
+        "length": { "type": "integer", "minimum": 1 },
+        "name": { "type": "string" },
+        "role": { "enum": ["input", "output", "input_output", "hidden", "ignored", "error_message"] },
+        "type": { "enum": ["string", "integer", "number", "boolean", "date", "time", "datetime"] },
+        "required": { "type": "boolean" },
+        "sensitive": { "type": "boolean" },
+        "optional": { "type": "boolean" },
+        "case_refs": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

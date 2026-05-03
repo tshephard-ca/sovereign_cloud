@@ -1,0 +1,15 @@
+name: file-server
+version: "1.0"
+workload_family: file_server
+description: Conservative review posture for file-serving workloads.
+threshold_overrides:
+  shared_fs_requires_rwx: true
+  storage_headroom_pct: 35
+required_evidence:
+  - df
+  - mount
+  - fstab
+  - ps
+reason_text:
+  FILE_SERVER_PROCESS_DETECTED: File-serving process evidence requires review of client access and locking semantics.
+

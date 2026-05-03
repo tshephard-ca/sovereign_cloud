@@ -1,0 +1,32 @@
+{
+  "event_id": "evt-2026-vol-001",
+  "started_at": "2026-01-01T00:00:00Z",
+  "observed_at": "2026-01-01T00:01:00Z",
+  "severity": "CRITICAL",
+  "attack_class": "VOLUMETRIC",
+  "mitigation_state": "ESCALATED",
+  "confidence": "HIGH",
+  "targets": [
+    {
+      "name": "public_web_vip",
+      "ip": "203.0.113.10",
+      "protocol": "tcp",
+      "ports": [80, 443],
+      "observed_bps": 2500000000,
+      "observed_pps": 1400000,
+      "baseline_bps": 100000000,
+      "baseline_pps": 80000
+    }
+  ],
+  "signals": {
+    "top_source_prefixes": ["198.51.100.0/24"],
+    "protocol_mix": {
+      "tcp_syn": 80,
+      "udp": 20
+    },
+    "spoofing_likely": true
+  },
+  "provider_actions_already_active": ["upstream_scrubbing"],
+  "notes": ["Volumetric sample event."]
+}
+

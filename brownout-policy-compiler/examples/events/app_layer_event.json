@@ -1,0 +1,32 @@
+{
+  "event_id": "evt-2026-app-001",
+  "started_at": "2026-01-01T00:00:00Z",
+  "observed_at": "2026-01-01T00:02:00Z",
+  "severity": "MEDIUM",
+  "attack_class": "APPLICATION",
+  "mitigation_state": "ACTIVE",
+  "confidence": "MEDIUM",
+  "targets": [
+    {
+      "name": "public_web_vip",
+      "ip": "203.0.113.10",
+      "protocol": "tcp",
+      "ports": [443],
+      "observed_bps": 90000000,
+      "observed_pps": 30000,
+      "baseline_bps": 20000000,
+      "baseline_pps": 8000
+    }
+  ],
+  "signals": {
+    "protocol_mix": {
+      "http_get": 95
+    },
+    "user_agent_anomalies": true,
+    "path_anomalies": ["/login", "/search"],
+    "spoofing_likely": false
+  },
+  "provider_actions_already_active": [],
+  "notes": ["Application-layer sample event."]
+}
+
