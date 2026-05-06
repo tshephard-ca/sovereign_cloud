@@ -56,6 +56,52 @@ def test_cli_extract_command_produces_all_requested_files(tmp_path):
     result = runner.invoke(
         app,
         [
+            "replay",
+            "--trace",
+            str(EXAMPLES / "order_lookup.trace.jsonl"),
+            "--contract",
+            str(contract),
+            "--case",
+            str(replay_case),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert '"ok": true' in result.output
+
+    replay_data = yaml.safe_load(replay_case.read_text())
+    bad_start = tmp_path / "bad_start.case.yml"
+    bad_start.write_text(yaml.safe_dump({**replay_data, "start_screen_hash": "bad"}))
+    result = runner.invoke(app, ["replay", "--trace", str(EXAMPLES / "order_lookup.trace.jsonl"), "--contract", str(contract), "--case", str(bad_start)])
+    assert result.exit_code == 1
+    assert "start screen hash mismatch" in result.output
+
+    bad_expect = tmp_path / "bad_expect.case.yml"
+    bad_expect_data = yaml.safe_load(replay_case.read_text())
+    bad_expect_data["steps"][0]["expect_screen_hash"] = "bad"
+    bad_expect.write_text(yaml.safe_dump(bad_expect_data))
+    result = runner.invoke(app, ["replay", "--trace", str(EXAMPLES / "order_lookup.trace.jsonl"), "--contract", str(contract), "--case", str(bad_expect)])
+    assert result.exit_code == 1
+    assert "expected screen hash mismatch" in result.output
+
+    bad_next = tmp_path / "bad_next.case.yml"
+    bad_next_data = yaml.safe_load(replay_case.read_text())
+    bad_next_data["steps"][0]["expect_next_screen_hash"] = "bad"
+    bad_next.write_text(yaml.safe_dump(bad_next_data))
+    result = runner.invoke(app, ["replay", "--trace", str(EXAMPLES / "order_lookup.trace.jsonl"), "--contract", str(contract), "--case", str(bad_next)])
+    assert result.exit_code == 1
+    assert "next screen hash mismatch" in result.output
+
+    bad_response = tmp_path / "bad_response.case.yml"
+    bad_response_data = yaml.safe_load(replay_case.read_text())
+    bad_response_data["expected_response"]["customer_name"] = "WRONG"
+    bad_response.write_text(yaml.safe_dump(bad_response_data))
+    result = runner.invoke(app, ["replay", "--trace", str(EXAMPLES / "order_lookup.trace.jsonl"), "--contract", str(contract), "--case", str(bad_response)])
+    assert result.exit_code == 1
+    assert "response mismatch for customer_name" in result.output
+
+    result = runner.invoke(
+        app,
+        [
             "validate-openapi",
             "--openapi",
             str(openapi),
@@ -75,6 +121,18 @@ def test_cli_validate_trace_reports_ok():
     )
     assert result.exit_code == 0, result.output
     assert '"ok": true' in result.output
+
+    result = runner.invoke(
+        app,
+        ["validate-trace", "--trace", str(EXAMPLES / "order_lookup.trace.jsonl"), "--screen-size", "24x80"],
+    )
+    assert result.exit_code == 0
+
+    result = runner.invoke(
+        app,
+        ["validate-trace", "--trace", str(EXAMPLES / "order_lookup.trace.jsonl"), "--screen-size", "bad"],
+    )
+    assert result.exit_code != 0
 
 
 def test_cli_real_world_data_commands(tmp_path):
@@ -246,3 +304,142 @@ def test_cli_compare_mutate_dataset_benchmark_and_bundle(tmp_path):
     result = runner.invoke(app, ["bundle-score", "--bundle", str(bundle)])
     assert result.exit_code == 0, result.output
     assert '"level": "partial"' in result.output
+
+
+def test_cli_error_and_report_branches(tmp_path):
+    runner = CliRunner()
+    no_screen_trace = tmp_path / "no_screen.trace.jsonl"
+    no_screen_trace.write_text('{"type":"action","seq":1,"aid":"ENTER","inputs":[]}\n')
+    result = runner.invoke(app, ["validate-trace", "--trace", str(no_screen_trace), "--strict"])
+    assert result.exit_code == 1
+    assert "NO_SCREEN_EVENTS" in result.output
+
+    result = runner.invoke(
+        app,
+        [
+            "extract",
+            "--trace",
+            str(no_screen_trace),
+            "--transaction-id",
+            "bad",
+            "--output-contract",
+            str(tmp_path / "bad.contract.yml"),
+            "--output-openapi",
+            str(tmp_path / "bad.openapi.yml"),
+            "--output-replay-test",
+            str(tmp_path / "test_bad.py"),
+            "--summary",
+            str(tmp_path / "bad.summary.json"),
+            "--strict",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "NO_SCREEN_EVENTS" in result.output
+
+    invalid_openapi = tmp_path / "invalid.openapi.yml"
+    invalid_openapi.write_text("openapi: 3.0.0\ninfo: {}\npaths: {}\n")
+    openapi_report = tmp_path / "openapi-report.json"
+    result = runner.invoke(app, ["validate-openapi", "--openapi", str(invalid_openapi), "--output", str(openapi_report)])
+    assert result.exit_code == 1
+    assert openapi_report.exists()
+    assert "OPENAPI_VERSION_NOT_3_1_0" in result.output
+
+    privacy = tmp_path / "privacy.json"
+    result = runner.invoke(
+        app,
+        [
+            "privacy-report",
+            "--trace",
+            str(EXAMPLES / "customer_update.trace.jsonl"),
+            "--field-map",
+            str(EXAMPLES / "customer_update.fields.yml"),
+            "--output",
+            str(privacy),
+            "--fail-on-sensitive-unredacted",
+        ],
+    )
+    assert result.exit_code == 1
+    assert privacy.exists()
+
+    result = runner.invoke(
+        app,
+        [
+            "mutate-trace",
+            "--trace",
+            str(EXAMPLES / "order_lookup.trace.jsonl"),
+            "--output",
+            str(tmp_path / "bad-mutate.trace.jsonl"),
+            "--change-label",
+            "missing-separator",
+        ],
+    )
+    assert result.exit_code != 0
+
+    adversarial = tmp_path / "adversarial"
+    result = runner.invoke(app, ["generate-adversarial-corpus", "--output", str(adversarial)])
+    assert result.exit_code == 0
+    assert (adversarial / "adversarial.json").exists()
+
+    incomplete = tmp_path / "incomplete"
+    incomplete.mkdir()
+    result = runner.invoke(app, ["coverage-report", "--package-root", str(incomplete), "--output", str(tmp_path / "coverage.json")])
+    assert result.exit_code == 1
+    assert '"complete": false' in result.output
+
+    result = runner.invoke(app, ["realism-report"])
+    assert result.exit_code != 0
+
+    corpus = tmp_path / "corpus"
+    result = runner.invoke(app, ["generate-corpus", "--output", str(corpus)])
+    assert result.exit_code == 0
+    package_report = tmp_path / "package-realism.json"
+    result = runner.invoke(
+        app,
+        ["realism-report", "--package", str(corpus / "synthetic_order_inquiry_multi_case"), "--output", str(package_report)],
+    )
+    assert result.exit_code == 0
+    assert package_report.exists()
+
+    bundle = tmp_path / "empty-ish.zip"
+    with zipfile.ZipFile(bundle, "w") as archive:
+        archive.writestr("manifest.json", "{}")
+    score_output = tmp_path / "bundle-score.json"
+    result = runner.invoke(app, ["bundle-score", "--bundle", str(bundle), "--output", str(score_output)])
+    assert result.exit_code == 0
+    assert score_output.exists()
+
+
+def test_cli_record_manual_writes_offline_trace(tmp_path):
+    runner = CliRunner()
+    output = tmp_path / "manual.trace.jsonl"
+    result = runner.invoke(
+        app,
+        ["record-manual", "--output", str(output), "--rows", "24", "--cols", "80"],
+        input=(
+            "FIRST SCREEN\n"
+            ".\n"
+            "y\n"
+            "1\n"
+            "1\n"
+            "5\n"
+            "y\n"
+            "HELLO\n"
+            "n\n"
+            "y\n"
+            "ENTER\n"
+            "y\n"
+            "f_01_01\n"
+            "1\n"
+            "1\n"
+            "HELLO\n"
+            "n\n"
+            "SECOND SCREEN\n"
+            ".\n"
+            "n\n"
+            "n\n"
+        ),
+    )
+    assert result.exit_code == 0, result.output
+    events = [json.loads(line) for line in output.read_text().splitlines()]
+    assert [event["type"] for event in events] == ["screen", "action", "screen"]
+    assert events[0]["fields"][0]["protected"] is True

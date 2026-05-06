@@ -48,6 +48,12 @@ class DatasetManifest(BaseModel):
     actual_maturity_level: MaturityLevel | None = None
     simulates_maturity_level: MaturityLevel | None = None
     description: str = ""
+    business_process: str = ""
+    operator_goal: str = ""
+    screen_family: str = ""
+    data_origin: str = ""
+    value_strategy: str = ""
+    known_limitations: list[str] = Field(default_factory=list)
     traces: dict[str, str] = Field(default_factory=dict)
     cases: dict[str, DatasetCase] = Field(default_factory=dict)
     field_map: str | None = None

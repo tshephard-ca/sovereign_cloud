@@ -23,6 +23,12 @@
     "actual_maturity_level": { "enum": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", null] },
     "simulates_maturity_level": { "enum": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", null] },
     "description": { "type": "string" },
+    "business_process": { "type": "string" },
+    "operator_goal": { "type": "string" },
+    "screen_family": { "type": "string" },
+    "data_origin": { "type": "string" },
+    "value_strategy": { "type": "string" },
+    "known_limitations": { "type": "array", "items": { "type": "string" } },
     "traces": { "type": "object", "additionalProperties": { "type": "string" } },
     "cases": {
       "type": "object",

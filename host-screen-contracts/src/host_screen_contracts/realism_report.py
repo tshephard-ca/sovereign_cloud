@@ -112,6 +112,14 @@ def _score_manifest(manifest: DatasetManifest, validation: dict[str, Any], bench
         dimensions["data_risk_scenario"] = 0
         gaps.append("missing_sensitive_or_complex_screen_scenario")
 
+    if manifest.business_process and manifest.operator_goal:
+        dimensions["business_context"] = 4
+        score += dimensions["business_context"]
+        strengths.append("business_context_declared")
+    else:
+        dimensions["business_context"] = 0
+        gaps.append("missing_business_process_or_operator_goal")
+
     if manifest.maturity_level in {"L4", "L5"} and len(manifest_cases(manifest)) < 2:
         gaps.append("high_maturity_package_needs_multiple_cases")
     if (manifest.actual_maturity_level or manifest.maturity_level) in {"L0", "L1"} or manifest.evidence_kind in {"deterministic_synthetic", "domain_realistic_synthetic"}:
@@ -142,6 +150,12 @@ def package_realism_report(package_dir: str | Path) -> dict[str, Any]:
         "evidence_kind": manifest.evidence_kind,
         "evidence_level": evidence_level,
         "synthetic": synthetic,
+        "business_process": manifest.business_process,
+        "operator_goal": manifest.operator_goal,
+        "screen_family": manifest.screen_family,
+        "data_origin": manifest.data_origin,
+        "value_strategy": manifest.value_strategy,
+        "known_limitations": manifest.known_limitations,
         "trace_count": len(cases),
         "case_ids": sorted(cases),
         "case_purposes": {case_id: case.purpose for case_id, case in sorted(cases.items())},

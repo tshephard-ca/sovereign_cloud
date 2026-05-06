@@ -25,9 +25,9 @@ from .label_inference import detect_function_keys, infer_screen_title, is_functi
 from .models import BlockerCode, Confidence, WarningCode, screen_ref_for_seq
 from .redact import REDACTED, redact_value
 from .replay_model import ReplayCase, ReplayStep
-from .screen_hash import compute_screen_hashes
+from .screen_hash import ScreenHashes, compute_screen_hashes
 from .subfile_analysis import analyze_subfile_regions
-from .trace_schema import ActionEvent, ScreenEvent, TraceEvent
+from .trace_schema import ActionEvent, ActionInput, ScreenEvent, TraceEvent
 from .validate_trace import validate_trace
 
 
@@ -36,6 +36,15 @@ class ExtractionResult:
     contract: TransactionContract
     replay_case: ReplayCase
     summary: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class RecordedAction:
+    from_screen_ref: str
+    from_screen: ScreenEvent
+    action: ActionEvent
+    to_screen_ref: str
+    to_screen: ScreenEvent
 
 
 def _default_display_name(transaction_id: str) -> str:
@@ -64,6 +73,61 @@ def _next_screen(events: list[TraceEvent], index: int) -> tuple[str, ScreenEvent
         if isinstance(event, ActionEvent):
             return None
     return None
+
+
+def _recorded_actions(events: list[TraceEvent]) -> list[RecordedAction]:
+    actions: list[RecordedAction] = []
+    for index, event in enumerate(events):
+        if not isinstance(event, ActionEvent):
+            continue
+        previous = _previous_screen(events, index)
+        next_screen = _next_screen(events, index)
+        if previous and next_screen:
+            from_ref, from_screen = previous
+            to_ref, to_screen = next_screen
+            actions.append(
+                RecordedAction(
+                    from_screen_ref=from_ref,
+                    from_screen=from_screen,
+                    action=event,
+                    to_screen_ref=to_ref,
+                    to_screen=to_screen,
+                )
+            )
+    return actions
+
+
+def _classification_action_pairs(recorded_actions: list[RecordedAction]) -> list[tuple[str, ScreenEvent, list[ActionInput]]]:
+    return [(recorded.from_screen_ref, recorded.from_screen, recorded.action.inputs) for recorded in recorded_actions]
+
+
+def _build_transition_and_replay_steps(
+    recorded_actions: list[RecordedAction],
+    screen_hashes: dict[str, ScreenHashes],
+) -> tuple[list[TransitionContract], list[ReplayStep]]:
+    transitions: list[TransitionContract] = []
+    replay_steps: list[ReplayStep] = []
+    for recorded in recorded_actions:
+        to_hash = screen_hashes[recorded.to_screen_ref].screen_hash
+        transitions.append(
+            TransitionContract(
+                from_screen_ref=recorded.from_screen_ref,
+                aid=recorded.action.aid,
+                action_aid=recorded.action.aid,
+                input_values={},
+                to_screen_ref=recorded.to_screen_ref,
+                expected_to_screen_hash=to_hash,
+            )
+        )
+        replay_steps.append(
+            ReplayStep(
+                expect_screen_hash=screen_hashes[recorded.from_screen_ref].screen_hash,
+                inputs={},
+                aid=recorded.action.aid,
+                expect_next_screen_hash=to_hash,
+            )
+        )
+    return transitions, replay_steps
 
 
 def _field_value(screen_ref: str, screen: ScreenEvent, field: ScreenFieldContract, field_map: FieldMap) -> str:
@@ -104,6 +168,151 @@ def _redact_action_value(value: str, field: ScreenFieldContract, entry: Any, red
     return value
 
 
+def _matching_request_field(
+    action_input: ActionInput,
+    from_screen_ref: str,
+    request_fields: list[ScreenFieldContract],
+) -> ScreenFieldContract | None:
+    for field in request_fields:
+        if field.screen_ref != from_screen_ref:
+            continue
+        if action_input.field_id and field.field_id == action_input.field_id:
+            return field
+        if action_input.row == field.row and action_input.col == field.col:
+            return field
+    return None
+
+
+def _populate_named_inputs(
+    recorded_actions: list[RecordedAction],
+    transitions: list[TransitionContract],
+    replay_steps: list[ReplayStep],
+    request_fields: list[ScreenFieldContract],
+    field_map: FieldMap,
+    *,
+    redact: bool,
+) -> None:
+    for transition, replay_step, recorded in zip(transitions, replay_steps, recorded_actions, strict=False):
+        named_inputs: dict[str, str] = {}
+        for action_input in recorded.action.inputs:
+            matching = _matching_request_field(action_input, recorded.from_screen_ref, request_fields)
+            if not matching:
+                continue
+            entry = field_map.find_by_reference(
+                recorded.from_screen_ref,
+                field_id=matching.field_id,
+                row=matching.row,
+                col=matching.col,
+            )
+            named_inputs[matching.name] = _redact_action_value(action_input.value, matching, entry, redact)
+        transition.input_values.update(named_inputs)
+        replay_step.inputs.update(named_inputs)
+
+
+def _screen_contracts(
+    screen_pairs: list[tuple[str, ScreenEvent]],
+    screen_hashes: dict[str, ScreenHashes],
+    fields_by_screen_ref: dict[str, list[ScreenFieldContract]],
+    field_map: FieldMap,
+    config: ExtractionConfig,
+) -> list[ScreenContract]:
+    screens: list[ScreenContract] = []
+    for screen_ref, screen in screen_pairs:
+        hashes = screen_hashes[screen_ref]
+        screens.append(
+            ScreenContract(
+                screen_ref=screen_ref,
+                screen_hash=hashes.screen_hash,
+                normalized_text_hash=hashes.normalized_text_hash,
+                field_layout_hash=hashes.field_layout_hash,
+                cursor_hash=hashes.cursor_hash,
+                title=infer_screen_title(screen, field_map=field_map, screen_ref=screen_ref),
+                rows=screen.rows,
+                cols=screen.cols,
+                fields=fields_by_screen_ref.get(screen_ref, []),
+                function_keys=detect_function_keys(screen),
+                subfile_regions=analyze_subfile_regions(screen, config),
+            )
+        )
+    return screens
+
+
+def _expected_response_values(
+    screen_pairs: list[tuple[str, ScreenEvent]],
+    response_fields: list[ScreenFieldContract],
+    field_map: FieldMap,
+    *,
+    redact: bool,
+) -> dict[str, str]:
+    expected_response: dict[str, str] = {}
+    screens_by_ref = dict(screen_pairs)
+    for field in response_fields:
+        screen = screens_by_ref.get(field.screen_ref)
+        if not screen:
+            continue
+        entry = field_map.find_by_reference(field.screen_ref, field_id=field.field_id, row=field.row, col=field.col)
+        expected_response[field.name] = redact_value(
+            _field_value(field.screen_ref, screen, field, field_map),
+            field.name,
+            entry,
+            redact=redact,
+        )
+    return expected_response
+
+
+def _screen_warnings(screen_pairs: list[tuple[str, ScreenEvent]], config: ExtractionConfig) -> list[str]:
+    warnings: list[str] = []
+    for _, screen in screen_pairs:
+        if detect_subfile_like(screen, config):
+            warnings.append(WarningCode.SUBFILE_LIKE_REGION_DETECTED.value)
+        if detect_error_screen(screen):
+            warnings.append(WarningCode.ERROR_SCREEN_RECORDED.value)
+        nonblank_rows = [row for row in screen.text if row.strip()]
+        if nonblank_rows and all(is_function_key_footer(row) for row in nonblank_rows):
+            warnings.append(WarningCode.FUNCTION_KEY_ONLY_SCREEN.value)
+    return warnings
+
+
+def _field_roles_by_screen(
+    request_fields: list[ScreenFieldContract],
+    response_fields: list[ScreenFieldContract],
+) -> dict[str, list[ScreenFieldContract]]:
+    fields_by_screen_ref: dict[str, list[ScreenFieldContract]] = {}
+    for field in request_fields + response_fields:
+        fields_by_screen_ref.setdefault(field.screen_ref, []).append(field)
+    return fields_by_screen_ref
+
+
+def _build_summary(
+    *,
+    transaction_id: str,
+    confidence: Confidence,
+    events: list[TraceEvent],
+    screens: list[ScreenContract],
+    request_fields: list[ScreenFieldContract],
+    response_fields: list[ScreenFieldContract],
+    warnings: list[str],
+    blockers: list[str],
+    output_paths: dict[str, str] | None,
+) -> dict[str, Any]:
+    coordinate_count, label_count, mapped_count = _summary_counts(request_fields + response_fields)
+    return {
+        "transaction_id": transaction_id,
+        "fit_for_review": not blockers,
+        "confidence": confidence.value,
+        "screen_count": len(screens),
+        "action_count": len([event for event in events if isinstance(event, ActionEvent)]),
+        "request_field_count": len(request_fields),
+        "response_field_count": len(response_fields),
+        "generated_coordinate_names": coordinate_count,
+        "inferred_label_names": label_count,
+        "field_map_names": mapped_count,
+        "warnings": warnings,
+        "blockers": blockers,
+        "outputs": output_paths or {},
+    }
+
+
 def extract_transaction(
     events: list[TraceEvent],
     *,
@@ -140,42 +349,10 @@ def extract_transaction(
     if plain_text_only:
         warnings.append(WarningCode.PLAIN_TEXT_ONLY_TRACE.value)
 
-    action_pairs = []
-    transitions: list[TransitionContract] = []
-    replay_steps: list[ReplayStep] = []
-    request_value_lookup: dict[tuple[str, str | None, int | None, int | None], str] = {}
-    for index, event in enumerate(events):
-        if not isinstance(event, ActionEvent):
-            continue
-        previous = _previous_screen(events, index)
-        next_screen = _next_screen(events, index)
-        if not previous or not next_screen:
-            continue
-        from_ref, from_screen = previous
-        to_ref, _to_screen = next_screen
-        action_pairs.append((from_ref, from_screen, event.inputs))
-        for action_input in event.inputs:
-            request_value_lookup[(from_ref, action_input.field_id, action_input.row, action_input.col)] = action_input.value
-        transitions.append(
-            TransitionContract(
-                from_screen_ref=from_ref,
-                aid=event.aid,
-                action_aid=event.aid,
-                input_values={},
-                to_screen_ref=to_ref,
-                expected_to_screen_hash=screen_hashes[to_ref].screen_hash,
-            )
-        )
-        replay_steps.append(
-            ReplayStep(
-                expect_screen_hash=screen_hashes[from_ref].screen_hash,
-                inputs={},
-                aid=event.aid,
-                expect_next_screen_hash=screen_hashes[to_ref].screen_hash,
-            )
-        )
+    recorded_actions = _recorded_actions(events)
+    transitions, replay_steps = _build_transition_and_replay_steps(recorded_actions, screen_hashes)
 
-    request_fields, request_warnings = request_fields_from_actions(action_pairs, field_map, config)
+    request_fields, request_warnings = request_fields_from_actions(_classification_action_pairs(recorded_actions), field_map, config)
     response_fields, response_warnings = response_fields_from_screens(screen_pairs, field_map, config)
     warnings.extend(request_warnings)
     warnings.extend(response_warnings)
@@ -188,79 +365,11 @@ def extract_transaction(
     if strict and any(field.inference_source == "coordinate" for field in request_fields + response_fields):
         blockers.append(BlockerCode.GENERATED_COORDINATE_NAMES_IN_STRICT_MODE.value)
 
-    for screen_ref, screen in screen_pairs:
-        if detect_subfile_like(screen, config):
-            warnings.append(WarningCode.SUBFILE_LIKE_REGION_DETECTED.value)
-        if detect_error_screen(screen):
-            warnings.append(WarningCode.ERROR_SCREEN_RECORDED.value)
-        nonblank_rows = [row for row in screen.text if row.strip()]
-        if nonblank_rows and all(is_function_key_footer(row) for row in nonblank_rows):
-            warnings.append(WarningCode.FUNCTION_KEY_ONLY_SCREEN.value)
+    warnings.extend(_screen_warnings(screen_pairs, config))
+    _populate_named_inputs(recorded_actions, transitions, replay_steps, request_fields, field_map, redact=redact)
 
-    request_field_by_screen_coord = {
-        (field.screen_ref, field.field_id, field.row, field.col): field for field in request_fields
-    }
-    for transition, replay_step, (from_ref, _screen, inputs) in zip(transitions, replay_steps, action_pairs, strict=False):
-        named_inputs: dict[str, str] = {}
-        for action_input in inputs:
-            matching = None
-            for field in request_fields:
-                if field.screen_ref != from_ref:
-                    continue
-                if action_input.field_id and field.field_id == action_input.field_id:
-                    matching = field
-                    break
-                if action_input.row == field.row and action_input.col == field.col:
-                    matching = field
-                    break
-            if matching:
-                entry = field_map.find_by_reference(
-                    from_ref,
-                    field_id=matching.field_id,
-                    row=matching.row,
-                    col=matching.col,
-                )
-                named_inputs[matching.name] = _redact_action_value(action_input.value, matching, entry, redact)
-        transition.input_values.update(named_inputs)
-        replay_step.inputs.update(named_inputs)
-
-    field_roles_by_screen: dict[str, list[ScreenFieldContract]] = {}
-    for field in request_fields + response_fields:
-        field_roles_by_screen.setdefault(field.screen_ref, []).append(field)
-
-    screens: list[ScreenContract] = []
-    for screen_ref, screen in screen_pairs:
-        hashes = screen_hashes[screen_ref]
-        screens.append(
-            ScreenContract(
-                screen_ref=screen_ref,
-                screen_hash=hashes.screen_hash,
-                normalized_text_hash=hashes.normalized_text_hash,
-                field_layout_hash=hashes.field_layout_hash,
-                cursor_hash=hashes.cursor_hash,
-                title=infer_screen_title(screen, field_map=field_map, screen_ref=screen_ref),
-                rows=screen.rows,
-                cols=screen.cols,
-                fields=field_roles_by_screen.get(screen_ref, []),
-                function_keys=detect_function_keys(screen),
-                subfile_regions=analyze_subfile_regions(screen, config),
-            )
-        )
-
-    final_ref, final_screen = screen_pairs[-1] if screen_pairs else ("", None)  # type: ignore[assignment]
-    expected_response: dict[str, str] = {}
-    if final_screen is not None:
-        for field in response_fields:
-            screen = dict(screen_pairs).get(field.screen_ref)
-            if not screen:
-                continue
-            entry = field_map.find_by_reference(field.screen_ref, field_id=field.field_id, row=field.row, col=field.col)
-            expected_response[field.name] = redact_value(
-                _field_value(field.screen_ref, screen, field, field_map),
-                field.name,
-                entry,
-                redact=redact,
-            )
+    screens = _screen_contracts(screen_pairs, screen_hashes, _field_roles_by_screen(request_fields, response_fields), field_map, config)
+    expected_response = _expected_response_values(screen_pairs, response_fields, field_map, redact=redact)
 
     start_hash = screens[0].screen_hash if screens else ""
     replay_case = ReplayCase(
@@ -296,21 +405,15 @@ def extract_transaction(
     )
     contract.flow_graph = build_flow_graph([(replay_case.case_id, case_kind, contract)])
 
-    all_fields = request_fields + response_fields
-    coordinate_count, label_count, mapped_count = _summary_counts(all_fields)
-    summary = {
-        "transaction_id": transaction_id,
-        "fit_for_review": not blockers,
-        "confidence": confidence.value,
-        "screen_count": len(screens),
-        "action_count": len([event for event in events if isinstance(event, ActionEvent)]),
-        "request_field_count": len(request_fields),
-        "response_field_count": len(response_fields),
-        "generated_coordinate_names": coordinate_count,
-        "inferred_label_names": label_count,
-        "field_map_names": mapped_count,
-        "warnings": warnings,
-        "blockers": blockers,
-        "outputs": output_paths or {},
-    }
+    summary = _build_summary(
+        transaction_id=transaction_id,
+        confidence=confidence,
+        events=events,
+        screens=screens,
+        request_fields=request_fields,
+        response_fields=response_fields,
+        warnings=warnings,
+        blockers=blockers,
+        output_paths=output_paths,
+    )
     return ExtractionResult(contract=contract, replay_case=replay_case, summary=summary)
