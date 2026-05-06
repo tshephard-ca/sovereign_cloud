@@ -90,7 +90,7 @@ PYTHONPATH=src python3 -m pytest -q
 Result after the enhancement pass:
 
 ```text
-57 passed
+59 passed
 ```
 
 Fresh run stages executed:
@@ -99,9 +99,9 @@ Fresh run stages executed:
 - Analyzed CloudTrail-style object events plus request hints and offline bucket config.
 - Produced a usage profile, probe plan, compatibility-needs CSV, and capability ledger.
 - Simulated target probe results to force full semantic coverage.
-- Produced mismatches, summary JSON/Markdown, cutover brief, remediation queue,
-  owner questions, compatibility matrix, policy evaluation, real-world assessment,
-  and strict-redaction case bundle.
+- Produced mismatches, summary JSON/Markdown, cutover brief, decision package,
+  remediation queue, grouped blocker/review view, owner questions, compatibility matrix, policy evaluation,
+  real-world assessment, and strict-redaction case bundle.
 - Validated the shareable bundle with strict redaction.
 
 Bundle validation result:
@@ -122,7 +122,8 @@ Generated input artifacts included:
 - Offline source bucket configuration.
 - Sanitized HTTP trace.
 - Server access log.
-- Business context.
+- Structured business-flow context.
+- Evidence manifest.
 - Policy context.
 - Corpus calibration metadata.
 
@@ -771,7 +772,7 @@ The strongest business positioning for `s3-compat-replay` is:
 
 > A local-first semantic compatibility preflight that turns observed S3-style object
 > storage behavior into safe target probes, concrete mismatch evidence, a cutover
-> decision brief, and owner-specific remediation questions before migration cutover.
+> decision package, and owner-specific remediation questions before migration cutover.
 
 That positioning is credible because the generated input covers real-world object
 storage semantics, the code implements a complete evidence-to-probe-to-decision
